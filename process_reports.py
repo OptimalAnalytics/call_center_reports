@@ -41,20 +41,20 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
                      'Can 31+']:
          skiprows=0
          cols = ['Acct Number','Days Delinquent','Current Date']
-         date_col = [4]
     elif sheet_name == 'GC-P30':
          skiprows=None
          cols = ['Acct Id Acc','Days Dlq Acf','Current Date']
-         date_col=[2]
     elif sheet_name == 'GC-EPD':
          skiprows=0
          cols = ['Acct Id Acc','Days Dlq Acf','Current Date']
-         date_col=[2]
     else:
         raise ValueError('Didnt know that sheetname')
 
 
-    df = excel_file.parse(sheet_name=sheet_name,skiprows=skiprows,parse_dates=date_col,converters={cols[0]:str})[cols].rename(columns=dict(zip(cols,global_names)))
+    df = excel_file.parse(
+        sheet_name=sheet_name,skiprows=skiprows,
+        converters={cols[0]:str,cols[-1]:pd.to_datetime}
+        )[cols].rename(columns=dict(zip(cols,global_names)))
     df['Bucket'] = sheet_name
     return df
 
@@ -67,7 +67,6 @@ excel_bucket = pd.ExcelFile(os.path.join(folder,bucket_fn))
 bucket_dfs = []
 for sheet in excel_bucket.sheet_names:
     bucket_dfs.append(read_bucket_sheet(sheet,excel_bucket))
-
 
 buckets = pd.concat(bucket_dfs,ignore_index=True)
 
@@ -99,8 +98,27 @@ all_df.loc[all_df['Acct_Num']=='20100816539453']
 # end%%
 
 # %%
-buckets.groupby(['Bucket','Date']).count()['Acct_Num']%%cmd
-all_df.groupby(['Bucket','Date'])[['Acct_Num','Acct Id Acc']].agg([pd.Series.nunique,'count'])
-all_df.groupby(['Bucket','Acct_Num','IB_OB','stripped','GC']).count()['Acct Id Acc']
+# buckets.groupby(['Bucket','Date']).count()['Acct_Num']
+all_df.rename(columns={'Acct_Num':'Queue','Acct Id Acc':'RPC'},inplace=True)
+
+all_df.groupby(['Bucket','Date'])[['Queue','RPC']].agg({'Queue':pd.Series.nunique,'RPC':[pd.Series.nunique,'count']})
+all_df.groupby(['Bucket','Date']).apply(lambda x: pd.Series(dict(
+    Queue_total=x['Queue'].nunique(),
+    Total_RPC=x['RPC'].count(),
+    Unique_RPC=x['RPC'].nunique(),
+    Total_PTP=x['RPC'].loc[x['stripped']=='PP'].count(),
+    Unique_PTP=x['RPC'].loc[x['stripped']=='PP'].nunique(),
+    T_Outbound_RPC=x['RPC'].loc[x['IB_OB']=='OB'].count(),
+    U_Outbound_RPC=x['RPC'].loc[x['IB_OB']=='OB'].nunique(),
+    T_Outbound_PTP=x['RPC'].loc[(x['IB_OB']=='OB') & (x['stripped']=='PP')].count(),
+    U_Outbound_PTP=x['RPC'].loc[(x['IB_OB']=='OB') & (x['stripped']=='PP')].nunique()
+    )))
+
+
+
+
+
+
+# all_df.groupby(['Bucket','Acct_Num','IB_OB','stripped','GC']).count()['Acct Id Acc']
 
 # end%%
