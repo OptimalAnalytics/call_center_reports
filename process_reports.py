@@ -1,33 +1,84 @@
 # %% Import Base Packages
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 import sys,os
-sns.set()
+import argparse
+import datetime
 # end%%
 
-# %%  Read in the raw data
-folder = 'Sample_Reports'
-rpc_fn = 'ALL_RPC-2-1-2018.xlsx'
 
-rpc = pd.read_excel(os.path.join(folder,rpc_fn),skiprows=0,converters={'Acct Id Acc':str})
-rpc.head()
+# %% main
+def main():
+
+    # Parse inputs
+    parser = argparse.ArgumentParser(
+        description='Read in the main files to create RPC summary')
+
+    parser.add_argument('rpc_fn',metavar='RPC_INPUT_PATH',
+        type=lambda x: is_valid_file(parser,x),
+        help='Needs to be the full or relative path to the RPC excel file')
+    parser.add_argument('bucket_fn',metavar='BUCKET_INPUT_PATH',
+        type=lambda x: is_valid_file(parser,x),
+        help='Needs to be the full or relative path to the Buckets excel file')
+    parser.add_argument('-o','--output_fn',type=str,
+        default='%s_RPC_summary.csv'%datetime.date.today().strftime('%Y_%m_%d'),
+        help='Output file location, defaults to YYYY_MM_DD_RPC_summary.csv')
+
+    args = parser.parse_args()
+    rpc_fn = args.rpc_fn
+    bucket_fn = args.bucket_fn
+    output_fn = args.output_fn
+
+    #Read in RPC file
+    rpc = pd.read_excel(rpc_fn,skiprows=0,converters={'Acct Id Acc':str})
+
+    # Process some of the RPC data to make it more useful
+    def ib_ob(action_type):
+        if action_type.upper().startswith('T'):
+            return 'OB'
+        else:
+            return 'IB'
+
+    rpc['IB_OB'] = rpc['Call Action Type Qcc'].apply(ib_ob)
+
+    rpc['stripped'] = rpc['Call Result Type Qcc'].apply(lambda x: x[:2])
+    rpc['GC'] = rpc['Created By Qcc'].apply(lambda x: x[:2])
+
+    #Get all the buckets
+    excel_bucket = pd.ExcelFile(bucket_fn)
+
+    bucket_dfs = []
+    for sheet in excel_bucket.sheet_names:
+        bucket_dfs.append(read_bucket_sheet(sheet,excel_bucket))
+
+    buckets = pd.concat(bucket_dfs,ignore_index=True)
+
+    # Remove any entry with a missing acct_num...these will likely be bad skiprows
+    # it does remoe any empty sheets however
+    buckets.dropna(subset=['Acct_Num'],inplace=True)
+
+    #Check the BUCKETS
+    if any(buckets.duplicated(subset=['Acct_Num'])):
+        print('You had a duplicate account number...that doesnt make a lot of sense')
+        print(buckets.loc[buckets.duplicated(subset=['Acct_Num'])])
+
+    # Merge the two together
+    all_df = pd.merge(buckets,rpc[['Acct Id Acc','IB_OB','stripped','GC']],
+        how='outer',left_on='Acct_Num',right_on='Acct Id Acc')
+
+    all_df.rename(columns={'Acct_Num':'Queue','Acct Id Acc':'RPC'},inplace=True)
+
+    summary_df = summarize_data(all_df)
+    summary_df.to_csv(output_fn)
+
 # end%%
 
-# %% Create Identification functions for apply
-def ib_ob(action_type):
-     if action_type.upper().startswith('T'):
-         return 'OB'
-     else:
-         return 'IB'
-
-rpc['IB_OB'] = rpc['Call Action Type Qcc'].apply(ib_ob)
-
-rpc['stripped'] = rpc['Call Result Type Qcc'].apply(lambda x: x[:2])
-rpc['GC'] = rpc['Created By Qcc'].apply(lambda x: x[:2])
-
-rpc.head()
+# %% Is valid file for arg parser
+def is_valid_file(parser,arg):
+    if not os.path.exists(arg):
+        parser.error("Cannot find the file: %s" % arg)
+    else:
+        return arg
 # end%%
 
 # %% Read sheets info
@@ -60,65 +111,66 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
 
 # end%%
 
-# %% Lets do this a little different...lets get all the bucket infor we think we may need
-bucket_fn = '2_1_18Bucket.xls'
-excel_bucket = pd.ExcelFile(os.path.join(folder,bucket_fn))
+# %%
+def summarize_data(all_df):
+    summary_df = all_df.groupby(['Bucket','Date']).apply(lambda x: pd.Series(dict(
+        Queue_total=x['Queue'].nunique(),
+        Total_RPC=x['RPC'].count(),
+        Unique_RPC=x['RPC'].nunique(),
+        Total_PTP=x['RPC'].loc[x['stripped']=='PP'].count(),
+        Unique_PTP=x['RPC'].loc[x['stripped']=='PP'].nunique(),
+        Outbound_RPC=x['RPC'].loc[x['IB_OB']=='OB'].count(),
+        Outbound_PTP=x['RPC'].loc[(x['IB_OB']=='OB') & (x['stripped']=='PP')].count(),
+        Inbound_RPC=x['RPC'].loc[x['IB_OB']=='IB'].count(),
+        Inbound_PTP=x['RPC'].loc[(x['IB_OB']=='IB') & (x['stripped']=='PP')].count(),
+        HD_RPC=x['RPC'].loc[x['GC'] != 'GC'].count(),
+        HD_PTP=x['RPC'].loc[(x['GC']!='GC') & (x['stripped']=='PP')].count(),
+        HD_OB_RPC=x['RPC'].loc[(x['GC'] != 'GC') & (x['IB_OB'] == 'OB')].count(),
+        HD_OB_PTP=x['RPC'].loc[(x['GC']!='GC') & (x['stripped']=='PP') & (x['IB_OB'] == 'OB')].count(),
+        HD_IB_RPC=x['RPC'].loc[(x['GC'] != 'GC') & (x['IB_OB'] == 'IB')].count(),
+        HD_IB_PTP=x['RPC'].loc[(x['GC']!='GC') & (x['stripped']=='PP') & (x['IB_OB'] == 'IB')].count(),
+        GC_RPC=x['RPC'].loc[x['GC'] == 'GC'].count(),
+        GC_PTP=x['RPC'].loc[(x['GC']=='GC') & (x['stripped']=='PP')].count(),
+        GC_OB_RPC=x['RPC'].loc[(x['GC'] == 'GC') & (x['IB_OB'] == 'OB')].count(),
+        GC_OB_PTP=x['RPC'].loc[(x['GC']=='GC') & (x['stripped']=='PP') & (x['IB_OB'] == 'OB')].count(),
+        GC_IB_RPC=x['RPC'].loc[(x['GC'] == 'GC') & (x['IB_OB'] == 'IB')].count(),
+        GC_IB_PTP=x['RPC'].loc[(x['GC']=='GC') & (x['stripped']=='PP') & (x['IB_OB'] == 'IB')].count(),
+        )))
 
-bucket_dfs = []
-for sheet in excel_bucket.sheet_names:
-    bucket_dfs.append(read_bucket_sheet(sheet,excel_bucket))
+    summary_df['U_RPC_Q'] = summary_df['Unique_RPC'].astype(np.float64)/ summary_df['Queue_total'].astype(np.float64)
+    summary_df['U_PTP_Q'] = summary_df['Unique_PTP'].astype(np.float64)/ summary_df['Queue_total'].astype(np.float64)
 
-buckets = pd.concat(bucket_dfs,ignore_index=True)
+    cols = [
+        'Queue_total',
+        'Total_RPC',
+        'Unique_RPC',
+        'Total_PTP',
+        'Unique_PTP',
+        'U_RPC_Q',
+        'U_PTP_Q',
+        'Outbound_RPC',
+        'Outbound_PTP',
+        'Inbound_RPC',
+        'Inbound_PTP',
+        'HD_RPC',
+        'HD_PTP',
+        'HD_OB_RPC',
+        'HD_OB_PTP',
+        'HD_IB_RPC',
+        'HD_IB_PTP',
+        'GC_RPC',
+        'GC_PTP',
+        'GC_OB_RPC',
+        'GC_OB_PTP',
+        'GC_IB_RPC',
+        'GC_IB_PTP']
 
-buckets.dropna(subset=['Acct_Num'],inplace=True)
+    summary_df = summary_df[cols]
 
-if any(buckets.duplicated(subset=['Acct_Num'])):
-    print('You had a duplicate account number...that doesnt make a lot of sense')
-    print(buckets.loc[buckets.duplicated(subset=['Acct_Num'])])
-else:
-    print('NO DUPLICATES IN BUCKETS...WOOT WOOT')
-
+    return summary_df
 # end%%
 
 # %%
-rpc['Acct Id Acc']
-rpc.head()
-
-buckets.head()
-
-all_df = pd.merge(buckets,rpc[['Acct Id Acc','IB_OB','stripped','GC']],
-    how='outer',left_on='Acct_Num',right_on='Acct Id Acc')
-# end%%
-
-# %%
-all_df.loc[all_df.duplicated(subset=['Acct_Num'],keep=False)]
-all_df.loc[all_df['Bucket'] == 'GC-P30']
-
-all_df.loc[all_df['Acct_Num']=='20100816539453']
-# end%%
-
-# %%
-# buckets.groupby(['Bucket','Date']).count()['Acct_Num']
-all_df.rename(columns={'Acct_Num':'Queue','Acct Id Acc':'RPC'},inplace=True)
-
-all_df.groupby(['Bucket','Date'])[['Queue','RPC']].agg({'Queue':pd.Series.nunique,'RPC':[pd.Series.nunique,'count']})
-all_df.groupby(['Bucket','Date']).apply(lambda x: pd.Series(dict(
-    Queue_total=x['Queue'].nunique(),
-    Total_RPC=x['RPC'].count(),
-    Unique_RPC=x['RPC'].nunique(),
-    Total_PTP=x['RPC'].loc[x['stripped']=='PP'].count(),
-    Unique_PTP=x['RPC'].loc[x['stripped']=='PP'].nunique(),
-    T_Outbound_RPC=x['RPC'].loc[x['IB_OB']=='OB'].count(),
-    U_Outbound_RPC=x['RPC'].loc[x['IB_OB']=='OB'].nunique(),
-    T_Outbound_PTP=x['RPC'].loc[(x['IB_OB']=='OB') & (x['stripped']=='PP')].count(),
-    U_Outbound_PTP=x['RPC'].loc[(x['IB_OB']=='OB') & (x['stripped']=='PP')].nunique()
-    )))
-
-
-
-
-
-
-# all_df.groupby(['Bucket','Acct_Num','IB_OB','stripped','GC']).count()['Acct Id Acc']
-
+if __name__ == '__main__':
+    main()
 # end%%
