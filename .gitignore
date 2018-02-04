@@ -1,2 +1,6 @@
 ~$*.xls*
 Katie Report UIPATH
+build
+dist
+__pycache__
+*.csv
