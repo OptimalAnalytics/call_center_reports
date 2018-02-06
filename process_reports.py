@@ -82,38 +82,14 @@ def main():
     all_df = pd.merge(buckets,rpc[['Acct Id Acc','IB_OB','stripped','GC','Agent']],
         how='outer',left_on='Acct_Num',right_on='Acct Id Acc')
 
-    all_df.rename(columns={'Acct_Num':'Queue','Acct Id Acc':'RPC'},inplace=True)
-
+    all_df.rename(columns={'Acct Id Acc':'RPC'},inplace=True)
+    # all_df.head()
     # all_df.loc[all_df['Associate'] == 'DAGREEN'].dropna(subset=['RPC'])
+    # all_df.dropna(subset=['RPC'])
     rpc_summary_df = rpc_summary(all_df)
     logging.debug('Output rpc summary to %s'%(output_fn))
     rpc_summary_df.to_csv(output_fn)
 
-# end%%
-
-# %% Logging
-def log_uncaught_exceptions(ex_cls, ex, tb):
-    logging.critical(''.join(traceback.format_tb(tb)))
-    logging.critical('{0}: {1}'.format(ex_cls, ex))
-
-# end%%
-# %% argparse overwriting
-class argparse_logger(argparse.ArgumentParser):
-    def _print_message(self, message, file=None):
-        if file is sys.stderr:
-            logging.warning('Arg Parse did something bad...see below:')
-            logging.error(message)
-        else:
-            super()._print_message(messag,file=file)
-
-# end%%
-
-# %% Is valid file for arg parser
-def is_valid_file(arg):
-    if not os.path.exists(arg):
-        # parser.error("Cannot find the file: %s" % arg)
-        raise argparse.ArgumentError("{0} does not exist".format(arg))
-    return arg
 # end%%
 
 # %% Read sheets info
@@ -137,6 +113,8 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
         cols = ['Acct Id Acc','Days Dlq Acf','Current Date']
     else:
         logging.warning('Sheetname %s - We dont have a known pattern...using default')
+        skiprows=0
+        cols = ['Acct Number','Days Delinquent','Current Date']
 
 
     try:
@@ -171,7 +149,7 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
 # %%
 def rpc_summary(all_df):
     summary_df = all_df.groupby(['Bucket','Date']).apply(lambda x: pd.Series(dict(
-        Queue_total=x['Queue'].nunique(),
+        Queue_total=x['Acct_Num'].nunique(),
         Total_RPC=x['RPC'].count(),
         Unique_RPC=x['RPC'].nunique(),
         Total_PTP=x['RPC'].loc[x['stripped']=='PP'].count(),
@@ -225,6 +203,32 @@ def rpc_summary(all_df):
     summary_df = summary_df[cols]
 
     return summary_df
+# end%%
+
+# %% Logging
+def log_uncaught_exceptions(ex_cls, ex, tb):
+    logging.critical(''.join(traceback.format_tb(tb)))
+    logging.critical('{0}: {1}'.format(ex_cls, ex))
+
+# end%%
+
+# %% argparse overwriting
+class argparse_logger(argparse.ArgumentParser):
+    def _print_message(self, message, file=None):
+        if file is sys.stderr:
+            logging.warning('Arg Parse did something bad...see below:')
+            logging.error(message)
+        else:
+            super()._print_message(messag,file=file)
+
+# end%%
+
+# %% Is valid file for arg parser
+def is_valid_file(arg):
+    if not os.path.exists(arg):
+        # parser.error("Cannot find the file: %s" % arg)
+        raise argparse.ArgumentTypeError("Specified file does not exist = {}".format(arg))
+    return arg
 # end%%
 
 # %%
