@@ -85,8 +85,8 @@ def main():
     all_df.rename(columns={'Acct_Num':'Queue','Acct Id Acc':'RPC'},inplace=True)
 
     # all_df.loc[all_df['Associate'] == 'DAGREEN'].dropna(subset=['RPC'])
-
     rpc_summary_df = rpc_summary(all_df)
+    logging.debug('Output rpc summary to %s'%(output_fn))
     rpc_summary_df.to_csv(output_fn)
 
 # end%%
@@ -139,10 +139,21 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
         logging.warning('Sheetname %s - We dont have a known pattern...using default')
 
 
+    try:
+        df = excel_file.parse(
+            sheet_name=sheet_name,skiprows=skiprows,
+            converters=
+                {cols[0]:str,
+                cols[-1]:lambda x: pd.to_datetime(x,format='%m/%d/%y')})
+    except ValueError as e:
+        logging.warn('Read buckets failed, likely datetime formatter for speed...repeating with no datetime formatter')
+        logging.warn('{0}'.format(e))
 
-    df = excel_file.parse(
-        sheet_name=sheet_name,skiprows=skiprows,
-        converters={cols[0]:str,cols[-1]:pd.to_datetime})
+        #Slower generic version
+        df = excel_file.parse(
+            sheet_name=sheet_name,skiprows=skiprows,
+            converters={cols[0]:str,cols[-1]:pd.to_datetime})
+
 
 
     if not queue_name in df.columns:
