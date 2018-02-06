@@ -4,34 +4,49 @@ import pandas as pd
 import sys,os
 import argparse
 import datetime
+import logging
+import traceback
 # end%%
-
 
 # %% main
 def main():
 
+    #Set up logger
+    logging.basicConfig(
+        level=logging.DEBUG,
+        filename='temp_log.log',
+        filemode='w',
+        format='%(asctime)s - %(levelname)s - %(message)s')
+    sys.excepthook = log_uncaught_exceptions
+
+    logging.debug('process_reports - STARTING SCRIPT')
     # Parse inputs
-    parser = argparse.ArgumentParser(
+    parser = argparse_logger(
         description='Read in the main files to create RPC summary')
 
     parser.add_argument('rpc_fn',metavar='RPC_INPUT_PATH',
-        type=lambda x: is_valid_file(parser,x),
+        type=is_valid_file,
         help='Needs to be the full or relative path to the RPC excel file')
     parser.add_argument('bucket_fn',metavar='BUCKET_INPUT_PATH',
-        type=lambda x: is_valid_file(parser,x),
+        type=is_valid_file,
         help='Needs to be the full or relative path to the Buckets excel file')
     parser.add_argument('-o','--output_fn',type=str,
         default='%s_RPC_summary.csv'%datetime.date.today().strftime('%Y_%m_%d'),
         help='Output file location, defaults to YYYY_MM_DD_RPC_summary.csv')
 
     args = parser.parse_args()
+
     rpc_fn = args.rpc_fn
     bucket_fn = args.bucket_fn
     output_fn = args.output_fn
 
+    # rpc_fn = os.path.join('Sample_Reports','ALL_RPC-2-1-2018.xlsx')
+    # bucket_fn = os.path.join('Sample_Reports','2_1_18Bucket.xls')
+    # output_fn = os.path.join('Sample_Reports','super.csv')
+
     #Read in RPC file
     rpc = pd.read_excel(rpc_fn,skiprows=0,converters={'Acct Id Acc':str})
-
+    rpc.head()
     # Process some of the RPC data to make it more useful
     def ib_ob(action_type):
         if action_type.upper().startswith('T'):
@@ -43,6 +58,7 @@ def main():
 
     rpc['stripped'] = rpc['Call Result Type Qcc'].apply(lambda x: x[:2])
     rpc['GC'] = rpc['Created By Qcc'].apply(lambda x: x[:2])
+    rpc.rename(columns={'Created By Qcc':'Agent'},inplace=True)
 
     #Get all the buckets
     excel_bucket = pd.ExcelFile(bucket_fn)
@@ -59,30 +75,51 @@ def main():
 
     #Check the BUCKETS
     if any(buckets.duplicated(subset=['Acct_Num'])):
-        print('You had a duplicate account number...that doesnt make a lot of sense')
-        print(buckets.loc[buckets.duplicated(subset=['Acct_Num'])])
+        logging.waring('You had a duplicate account number...that doesnt make a lot of sense')
+        logging.warning(buckets.loc[buckets.duplicated(subset=['Acct_Num'])])
 
     # Merge the two together
-    all_df = pd.merge(buckets,rpc[['Acct Id Acc','IB_OB','stripped','GC']],
+    all_df = pd.merge(buckets,rpc[['Acct Id Acc','IB_OB','stripped','GC','Agent']],
         how='outer',left_on='Acct_Num',right_on='Acct Id Acc')
 
     all_df.rename(columns={'Acct_Num':'Queue','Acct Id Acc':'RPC'},inplace=True)
 
-    summary_df = summarize_data(all_df)
-    summary_df.to_csv(output_fn)
+    # all_df.loc[all_df['Associate'] == 'DAGREEN'].dropna(subset=['RPC'])
+
+    rpc_summary_df = rpc_summary(all_df)
+    rpc_summary_df.to_csv(output_fn)
+
+# end%%
+
+# %% Logging
+def log_uncaught_exceptions(ex_cls, ex, tb):
+    logging.critical(''.join(traceback.format_tb(tb)))
+    logging.critical('{0}: {1}'.format(ex_cls, ex))
+
+# end%%
+# %% argparse overwriting
+class argparse_logger(argparse.ArgumentParser):
+    def _print_message(self, message, file=None):
+        if file is sys.stderr:
+            logging.warning('Arg Parse did something bad...see below:')
+            logging.error(message)
+        else:
+            super()._print_message(messag,file=file)
 
 # end%%
 
 # %% Is valid file for arg parser
-def is_valid_file(parser,arg):
+def is_valid_file(arg):
     if not os.path.exists(arg):
-        parser.error("Cannot find the file: %s" % arg)
-    else:
-        return arg
+        # parser.error("Cannot find the file: %s" % arg)
+        raise argparse.ArgumentError("{0} does not exist".format(arg))
+    return arg
 # end%%
 
 # %% Read sheets info
-def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq','Date']):
+def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq','Date'],
+    queue_name='Associate'):
+    logging.debug('Reading %s'%(sheet_name))
     if sheet_name in ['60 Day',
                      'Mid GC',
                      'Mid In',
@@ -90,29 +127,38 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
                      'FPD 2-30',
                      'Can 2-30',
                      'Can 31+']:
-         skiprows=0
-         cols = ['Acct Number','Days Delinquent','Current Date']
+        skiprows=0
+        cols = ['Acct Number','Days Delinquent','Current Date']
     elif sheet_name == 'GC-P30':
-         skiprows=None
-         cols = ['Acct Id Acc','Days Dlq Acf','Current Date']
+        skiprows=None
+        cols = ['Acct Id Acc','Days Dlq Acf','Current Date']
     elif sheet_name == 'GC-EPD':
-         skiprows=0
-         cols = ['Acct Id Acc','Days Dlq Acf','Current Date']
+        skiprows=0
+        cols = ['Acct Id Acc','Days Dlq Acf','Current Date']
     else:
-        raise ValueError('Didnt know that sheetname')
+        logging.warning('Sheetname %s - We dont have a known pattern...using default')
+
 
 
     df = excel_file.parse(
         sheet_name=sheet_name,skiprows=skiprows,
-        converters={cols[0]:str,cols[-1]:pd.to_datetime}
-        )[cols].rename(columns=dict(zip(cols,global_names)))
+        converters={cols[0]:str,cols[-1]:pd.to_datetime})
+
+
+    if not queue_name in df.columns:
+        df[queue_name] = np.nan
+
+    df.rename(columns=dict(zip(cols,global_names)),inplace=True)
+
     df['Bucket'] = sheet_name
-    return df
+
+
+    return df[global_names + [queue_name] + ['Bucket']]
 
 # end%%
 
 # %%
-def summarize_data(all_df):
+def rpc_summary(all_df):
     summary_df = all_df.groupby(['Bucket','Date']).apply(lambda x: pd.Series(dict(
         Queue_total=x['Queue'].nunique(),
         Total_RPC=x['RPC'].count(),
