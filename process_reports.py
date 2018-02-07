@@ -40,13 +40,17 @@ def main():
     bucket_fn = args.bucket_fn
     output_fn = args.output_fn
 
+    # logging.basicConfig(
+    #     level=logging.DEBUG,
+    #     format='%(asctime)s - %(levelname)s - %(message)s')
+    #
     # rpc_fn = os.path.join('Sample_Reports','ALL_RPC-2-1-2018.xlsx')
     # bucket_fn = os.path.join('Sample_Reports','2_1_18Bucket.xls')
     # output_fn = os.path.join('Sample_Reports','super.csv')
 
     #Read in RPC file
     rpc = pd.read_excel(rpc_fn,skiprows=0,converters={'Acct Id Acc':str})
-    rpc.head()
+
     # Process some of the RPC data to make it more useful
     def ib_ob(action_type):
         if action_type.upper().startswith('T'):
@@ -83,12 +87,18 @@ def main():
         how='outer',left_on='Acct_Num',right_on='Acct Id Acc')
 
     all_df.rename(columns={'Acct Id Acc':'RPC'},inplace=True)
-    # all_df.head()
-    # all_df.loc[all_df['Associate'] == 'DAGREEN'].dropna(subset=['RPC'])
-    # all_df.dropna(subset=['RPC'])
+
+
     rpc_summary_df = rpc_summary(all_df)
+    Queue_Summary_df = Queue_Summary(all_df)
+    Agent_Summary_df = Agent_Summary(all_df)
+
+
     logging.debug('Output rpc summary to %s'%(output_fn))
     rpc_summary_df.to_csv(output_fn)
+
+    Queue_Summary_df.to_csv('Queue_Summary.csv')
+    Agent_Summary_df.to_csv('Agent_Summary.csv')
 
 # end%%
 
@@ -201,6 +211,86 @@ def rpc_summary(all_df):
         'GC_IB_PTP']
 
     summary_df = summary_df[cols]
+
+    return summary_df
+def Queue_Summary(all_df):
+    summary_df = all_df.groupby(['Bucket','Associate','Date']).apply(lambda x: pd.Series(dict(
+        Queue=x['Acct_Num'].nunique(),
+        Total_RPC=x['RPC'].count(),
+        Unique_RPC=x['RPC'].nunique(),
+        Total_PTP=x['RPC'].loc[x['stripped']=='PP'].count(),
+        Unique_PTP=x['RPC'].loc[x['stripped']=='PP'].nunique(),
+        Outbound_RPC=x['RPC'].loc[x['IB_OB']=='OB'].count(),
+        Outbound_PTP=x['RPC'].loc[(x['IB_OB']=='OB') & (x['stripped']=='PP')].count(),
+        Inbound_RPC=x['RPC'].loc[x['IB_OB']=='IB'].count(),
+        Inbound_PTP=x['RPC'].loc[(x['IB_OB']=='IB') & (x['stripped']=='PP')].count(),
+        HD_RPC=x['RPC'].loc[x['GC'] != 'GC'].count(),
+        HD_PTP=x['RPC'].loc[(x['GC']!='GC') & (x['stripped']=='PP')].count(),
+        HD_OB_RPC=x['RPC'].loc[(x['GC'] != 'GC') & (x['IB_OB'] == 'OB')].count(),
+        HD_OB_PTP=x['RPC'].loc[(x['GC']!='GC') & (x['stripped']=='PP') & (x['IB_OB'] == 'OB')].count(),
+        HD_IB_RPC=x['RPC'].loc[(x['GC'] != 'GC') & (x['IB_OB'] == 'IB')].count(),
+        HD_IB_PTP=x['RPC'].loc[(x['GC']!='GC') & (x['stripped']=='PP') & (x['IB_OB'] == 'IB')].count(),
+        GC_RPC=x['RPC'].loc[x['GC'] == 'GC'].count(),
+        GC_PTP=x['RPC'].loc[(x['GC']=='GC') & (x['stripped']=='PP')].count(),
+        GC_OB_RPC=x['RPC'].loc[(x['GC'] == 'GC') & (x['IB_OB'] == 'OB')].count(),
+        GC_OB_PTP=x['RPC'].loc[(x['GC']=='GC') & (x['stripped']=='PP') & (x['IB_OB'] == 'OB')].count(),
+        GC_IB_RPC=x['RPC'].loc[(x['GC'] == 'GC') & (x['IB_OB'] == 'IB')].count(),
+        GC_IB_PTP=x['RPC'].loc[(x['GC']=='GC') & (x['stripped']=='PP') & (x['IB_OB'] == 'IB')].count(),
+        )))
+
+    summary_df['U_RPC_Q'] = summary_df['Unique_RPC'].astype(np.float64)/ summary_df['Queue'].astype(np.float64)
+    summary_df['U_PTP_Q'] = summary_df['Unique_PTP'].astype(np.float64)/ summary_df['Queue'].astype(np.float64)
+
+    cols = [
+        'Queue',
+        'Total_RPC',
+        'Unique_RPC',
+        'Total_PTP',
+        'Unique_PTP',
+        'U_RPC_Q',
+        'U_PTP_Q',
+        'Outbound_RPC',
+        'Outbound_PTP',
+        'Inbound_RPC',
+        'Inbound_PTP',
+        'HD_RPC',
+        'HD_PTP',
+        'HD_OB_RPC',
+        'HD_OB_PTP',
+        'HD_IB_RPC',
+        'HD_IB_PTP',
+        'GC_RPC',
+        'GC_PTP',
+        'GC_OB_RPC',
+        'GC_OB_PTP',
+        'GC_IB_RPC',
+        'GC_IB_PTP']
+
+    summary_df = summary_df[cols]
+
+    return summary_df
+def Agent_Summary(all_df):
+    only_queue_agents = all_df.loc[all_df['Agent'].isin(all_df['Associate'].unique())]
+    summary_df = only_queue_agents.groupby(['Bucket','Agent','Date']).apply(lambda x: pd.Series(dict(
+        Unique_RPC=x['RPC'].nunique(),
+        Unique_PTP=x['RPC'].loc[x['stripped']=='PP'].nunique(),
+        Outbound_RPC=x['RPC'].loc[x['IB_OB']=='OB'].count(),
+        Outbound_PTP=x['RPC'].loc[(x['IB_OB']=='OB') & (x['stripped']=='PP')].count(),
+        Inbound_RPC=x['RPC'].loc[x['IB_OB']=='IB'].count(),
+        Inbound_PTP=x['RPC'].loc[(x['IB_OB']=='IB') & (x['stripped']=='PP')].count())))
+
+
+    cols = [
+        'Unique_RPC',
+        'Unique_PTP',
+        'Outbound_RPC',
+        'Outbound_PTP',
+        'Inbound_RPC',
+        'Inbound_PTP']
+
+    summary_df = summary_df[cols]
+
+
 
     return summary_df
 # end%%
