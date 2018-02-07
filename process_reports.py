@@ -6,20 +6,14 @@ import argparse
 import datetime
 import logging
 import traceback
+from colored_logger import customLogger
 # end%%
 
 # %% main
 def main():
 
-    #Set up logger
-    logging.basicConfig(
-        level=logging.DEBUG,
-        filename='temp_log.log',
-        filemode='w',
-        format='%(asctime)s - %(levelname)s - %(message)s')
-    sys.excepthook = log_uncaught_exceptions
+    logger.info('process_reports - STARTING SCRIPT')
 
-    logging.debug('process_reports - STARTING SCRIPT')
     # Parse inputs
     parser = argparse_logger(
         description='Read in the main files to create RPC summary')
@@ -30,9 +24,9 @@ def main():
     parser.add_argument('bucket_fn',metavar='BUCKET_INPUT_PATH',
         type=is_valid_file,
         help='Needs to be the full or relative path to the Buckets excel file')
-    parser.add_argument('-o','--output_fn',type=str,
-        default='%s_RPC_summary.csv'%datetime.date.today().strftime('%Y_%m_%d'),
-        help='Output file location, defaults to YYYY_MM_DD_RPC_summary.csv')
+    parser.add_argument('-o','--output_fn',metavar='OUTPUT_FN_HEADER',type=str,
+        default='%s'%datetime.date.today().strftime('%Y_%m_%d'),
+        help='Output file location, defaults to YYYY_MM_DD_<DESCRIP>.csv')
 
     args = parser.parse_args()
 
@@ -40,15 +34,8 @@ def main():
     bucket_fn = args.bucket_fn
     output_fn = args.output_fn
 
-    # logging.basicConfig(
-    #     level=logging.DEBUG,
-    #     format='%(asctime)s - %(levelname)s - %(message)s')
-    #
-    # rpc_fn = os.path.join('Sample_Reports','ALL_RPC-2-1-2018.xlsx')
-    # bucket_fn = os.path.join('Sample_Reports','2_1_18Bucket.xls')
-    # output_fn = os.path.join('Sample_Reports','super.csv')
-
     #Read in RPC file
+    logger.debug('Reading in rpc data file: %s'%(rpc_fn))
     rpc = pd.read_excel(rpc_fn,skiprows=0,converters={'Acct Id Acc':str})
 
     # Process some of the RPC data to make it more useful
@@ -65,6 +52,7 @@ def main():
     rpc.rename(columns={'Created By Qcc':'Agent'},inplace=True)
 
     #Get all the buckets
+    logger.debug('Reading in bucket data file: %s'%(bucket_fn))
     excel_bucket = pd.ExcelFile(bucket_fn)
 
     bucket_dfs = []
@@ -79,33 +67,43 @@ def main():
 
     #Check the BUCKETS
     if any(buckets.duplicated(subset=['Acct_Num'])):
-        logging.waring('You had a duplicate account number...that doesnt make a lot of sense')
-        logging.warning(buckets.loc[buckets.duplicated(subset=['Acct_Num'])])
+        logger.waring('You had a duplicate account number...that doesnt make a lot of sense')
+        logger.warning(buckets.loc[buckets.duplicated(subset=['Acct_Num'])])
+
 
     # Merge the two together
+    logger.debug('merging bucket and rpc information')
     all_df = pd.merge(buckets,rpc[['Acct Id Acc','IB_OB','stripped','GC','Agent']],
         how='outer',left_on='Acct_Num',right_on='Acct Id Acc')
 
     all_df.rename(columns={'Acct Id Acc':'RPC'},inplace=True)
 
-
+    #Summarize and output
+    logger.debug('summarizing data...')
     rpc_summary_df = rpc_summary(all_df)
     Queue_Summary_df = Queue_Summary(all_df)
     Agent_Summary_df = Agent_Summary(all_df)
 
+    write_fn = '%s_RPC_Summary.csv'%(output_fn)
+    logger.debug('Output rpc summary to %s'%(write_fn))
+    rpc_summary_df.to_csv(write_fn)
 
-    logging.debug('Output rpc summary to %s'%(output_fn))
-    rpc_summary_df.to_csv(output_fn)
+    write_fn = '%s_Queue_Summary.csv'%(output_fn)
+    logger.debug('Output Queue summary to %s'%(write_fn))
+    Queue_Summary_df.to_csv(write_fn)
 
-    Queue_Summary_df.to_csv('Queue_Summary.csv')
-    Agent_Summary_df.to_csv('Agent_Summary.csv')
+    write_fn = '%s_Agent_Summary.csv'%(output_fn)
+    logger.debug('Output Agent summary to %s'%(write_fn))
+    Agent_Summary_df.to_csv(write_fn)
+
+    logger.info('Ending Script successfully')
 
 # end%%
 
 # %% Read sheets info
 def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq','Date'],
     queue_name='Associate'):
-    logging.debug('Reading %s'%(sheet_name))
+    logger.debug('Reading %s'%(sheet_name))
     if sheet_name in ['60 Day',
                      'Mid GC',
                      'Mid In',
@@ -122,7 +120,7 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
         skiprows=0
         cols = ['Acct Id Acc','Days Dlq Acf','Current Date']
     else:
-        logging.warning('Sheetname %s - We dont have a known pattern...using default')
+        logger.warning('Sheetname %s - We dont have a known pattern...using default')
         skiprows=0
         cols = ['Acct Number','Days Delinquent','Current Date']
 
@@ -134,8 +132,8 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
                 {cols[0]:str,
                 cols[-1]:lambda x: pd.to_datetime(x,format='%m/%d/%y')})
     except ValueError as e:
-        logging.warn('Read buckets failed, likely datetime formatter for speed...repeating with no datetime formatter')
-        logging.warn('{0}'.format(e))
+        logger.warn('Read buckets failed, likely datetime formatter for speed...repeating with no datetime formatter')
+        logger.warn('{0}'.format(e))
 
         #Slower generic version
         df = excel_file.parse(
@@ -295,10 +293,10 @@ def Agent_Summary(all_df):
     return summary_df
 # end%%
 
-# %% Logging
+# %% logger
 def log_uncaught_exceptions(ex_cls, ex, tb):
-    logging.critical(''.join(traceback.format_tb(tb)))
-    logging.critical('{0}: {1}'.format(ex_cls, ex))
+    logger.critical(''.join(traceback.format_tb(tb)))
+    logger.critical('{0}: {1}'.format(ex_cls, ex))
 
 # end%%
 
@@ -306,8 +304,8 @@ def log_uncaught_exceptions(ex_cls, ex, tb):
 class argparse_logger(argparse.ArgumentParser):
     def _print_message(self, message, file=None):
         if file is sys.stderr:
-            logging.warning('Arg Parse did something bad...see below:')
-            logging.error(message)
+            logger.warning('Arg Parse did something bad...see below:')
+            logger.error(message)
         else:
             super()._print_message(messag,file=file)
 
@@ -323,5 +321,8 @@ def is_valid_file(arg):
 
 # %%
 if __name__ == '__main__':
+    #  Set up logger
+    logger = customLogger('report',fn='process_reports.log',mode='a')
+    sys.excepthook = log_uncaught_exceptions
     main()
 # end%%
