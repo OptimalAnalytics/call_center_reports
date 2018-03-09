@@ -6,7 +6,9 @@ import argparse
 import datetime
 import logging
 import traceback
-from colored_logger import customLogger
+from colored_logger import
+from tkinter import Tk
+from tkinter.filedialog import askopenfilename
 # end%%
 
 # %% main
@@ -44,13 +46,17 @@ def main():
             return 'OB'
         else:
             return 'IB'
+    try:
+        rpc['IB_OB'] = rpc['Call Action Type Qcc'].apply(ib_ob)
 
-    rpc['IB_OB'] = rpc['Call Action Type Qcc'].apply(ib_ob)
-
-    rpc['stripped'] = rpc['Call Result Type Qcc'].apply(lambda x: x[:2])
-    rpc['GC'] = rpc['Created By Qcc'].apply(lambda x: x[:2])
-    rpc.rename(columns={'Created By Qcc':'Agent'},inplace=True)
-
+        rpc['stripped'] = rpc['Call Result Type Qcc'].apply(lambda x: x[:2])
+        rpc['GC'] = rpc['Created By Qcc'].apply(lambda x: x[:2])
+        rpc.rename(columns={'Created By Qcc':'Agent'},inplace=True)
+    except KeyError as e:
+        # logger.exception("message")
+        logger.error('Couldn"t find the key: "%s" in the RPC file: %s.  You may have input the wrong file or the file may be corrupt'%(e.args[0],rpc_fn))
+        logger.critical('ABORTING SCRIPT')
+        sys.exit(0)
     #Get all the buckets
     logger.debug('Reading in bucket data file: %s'%(bucket_fn))
     excel_bucket = pd.ExcelFile(bucket_fn)
@@ -120,10 +126,9 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
         skiprows=0
         cols = ['Acct Id Acc','Days Dlq Acf','Current Date']
     else:
-        logger.warning('Sheetname %s - We dont have a known pattern...using default')
+        logger.warning('Sheetname %s - We dont have a known pattern...using default'%(sheet_name))
         skiprows=0
         cols = ['Acct Number','Days Delinquent','Current Date']
-
 
     try:
         df = excel_file.parse(
@@ -140,14 +145,18 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
             sheet_name=sheet_name,skiprows=skiprows,
             converters={cols[0]:str,cols[-1]:pd.to_datetime})
 
-
-
+    # Fill in queuename with nans if it doesn't exist
     if not queue_name in df.columns:
         df[queue_name] = np.nan
 
+    #Rename the columns
     df.rename(columns=dict(zip(cols,global_names)),inplace=True)
 
+    # Add the bucket Column
     df['Bucket'] = sheet_name
+
+    if len(df.dropna(subset=[global_names[0]]).index) <1:
+        logger.warn('%s was empty and had no account numbers.  Could be something wrong.'%(sheet_name))
 
 
     return df[global_names + [queue_name] + ['Bucket']]
@@ -307,7 +316,7 @@ class argparse_logger(argparse.ArgumentParser):
             logger.warning('Arg Parse did something bad...see below:')
             logger.error(message)
         else:
-            super()._print_message(messag,file=file)
+            super()._print_message(message,file=file)
 
 # end%%
 
