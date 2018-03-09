@@ -6,10 +6,11 @@ import argparse
 import datetime
 import logging
 import traceback
-from colored_logger import
+from colored_logger import customLogger
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
 # end%%
+
 
 # %% main
 def main():
@@ -20,10 +21,10 @@ def main():
     parser = argparse_logger(
         description='Read in the main files to create RPC summary')
 
-    parser.add_argument('rpc_fn',metavar='RPC_INPUT_PATH',
+    parser.add_argument('-r','--rpc_fn',metavar='RPC_INPUT_PATH',
         type=is_valid_file,
         help='Needs to be the full or relative path to the RPC excel file')
-    parser.add_argument('bucket_fn',metavar='BUCKET_INPUT_PATH',
+    parser.add_argument('-b','--bucket_fn',metavar='BUCKET_INPUT_PATH',
         type=is_valid_file,
         help='Needs to be the full or relative path to the Buckets excel file')
     parser.add_argument('-o','--output_fn',metavar='OUTPUT_FN_HEADER',type=str,
@@ -32,8 +33,8 @@ def main():
 
     args = parser.parse_args()
 
-    rpc_fn = args.rpc_fn
-    bucket_fn = args.bucket_fn
+    rpc_fn = get_input_file(args,'rpc_fn','RPC')
+    bucket_fn = get_input_file(args,'bucket_fn','Buckets')
     output_fn = args.output_fn
 
     #Read in RPC file
@@ -326,6 +327,30 @@ def is_valid_file(arg):
         # parser.error("Cannot find the file: %s" % arg)
         raise argparse.ArgumentTypeError("Specified file does not exist = {}".format(arg))
     return arg
+# end%%
+
+# %% Open file if you don't want to specify in the command line
+def get_input_file(parsed_args,key,real_text=None):
+
+    if real_text is None:
+        real_text = key
+
+    if vars(parsed_args)[key] is None:
+        logger.debug('You didnt enter a file in the command line for %s...opening dialog'%(key))
+        return tk_open_file('Select File for %s'%real_text)
+    else:
+        return vars(parsed_args)[key]
+
+def tk_open_file(title=None):
+    # http://infohost.nmt.edu/tcc/help/pubs/tkinter/web/tkFileDialog.html - For options
+    Tk().withdraw() # we don't want a full GUI, so keep the root window from appearing
+    filename = askopenfilename(title=title) # show an "Open" dialog box and return the path to the selected file
+    if not filename:
+        logger.error('You didnt select a filename for %s'%(title))
+        logger.critical('ABORTING SCRIPT')
+        sys.exit(0)
+    return filename
+
 # end%%
 
 # %%
