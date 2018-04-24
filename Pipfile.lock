@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "234b9daf753fb96dbe58074d1259cd5841e5238d18ee371b6aa4b34601082b83"
+            "sha256": "ed5fb9dad455899bc05f93852aade288996c2cb52b894b03e341f9ea399960e1"
         },
         "pipfile-spec": 6,
         "requires": {},
@@ -14,6 +14,10 @@
         ]
     },
     "default": {
+        "15a9268": {
+            "editable": true,
+            "path": ".\\..\\colored_logger"
+        },
         "numpy": {
             "hashes": [
                 "sha256:0739146eaf4985962f07c62f7133aca89f3a600faac891ce6c7f3a1e2afe5272",
