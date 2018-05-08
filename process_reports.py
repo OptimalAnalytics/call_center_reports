@@ -88,19 +88,13 @@ def main():
     #Summarize and output
     logger.debug('summarizing data...')
     rpc_summary_df = rpc_summary(all_df)
-    write_fn = '%s_RPC_Summary.csv'%(output_fn)
-    logger.debug('Output rpc summary to %s'%(write_fn))
-    rpc_summary_df.to_csv(write_fn)
+    to_csv(rpc_summary_df,output_fn,'RPC_Summary')
 
     Queue_Summary_df = Queue_Summary(all_df)
-    write_fn = '%s_Queue_Summary.csv'%(output_fn)
-    logger.debug('Output Queue summary to %s'%(write_fn))
-    Queue_Summary_df.to_csv(write_fn)
+    to_csv(Queue_Summary_df,output_fn,'Queue_Summary')
 
     Agent_Summary_df = Agent_Summary(all_df)
-    write_fn = '%s_Agent_Summary.csv'%(output_fn)
-    logger.debug('Output Agent summary to %s'%(write_fn))
-    Agent_Summary_df.to_csv(write_fn)
+    to_csv(Agent_Summary_df,output_fn,'Agent_Summary')
 
     logger.info('Ending Script successfully')
 
@@ -192,6 +186,7 @@ def rpc_summary(all_df):
     summary_df['U_RPC_Q'] = summary_df['Unique_RPC'].astype(np.float64)/ summary_df['Queue_total'].astype(np.float64)
     summary_df['U_PTP_Q'] = summary_df['Unique_PTP'].astype(np.float64)/ summary_df['Queue_total'].astype(np.float64)
 
+    # Reorder Cols
     cols = [
         'Queue_total',
         'Total_RPC',
@@ -248,6 +243,7 @@ def Queue_Summary(all_df):
     summary_df['U_RPC_Q'] = summary_df['Unique_RPC'].astype(np.float64)/ summary_df['Queue'].astype(np.float64)
     summary_df['U_PTP_Q'] = summary_df['Unique_PTP'].astype(np.float64)/ summary_df['Queue'].astype(np.float64)
 
+    # Reorder cols
     cols = [
         'Queue',
         'Total_RPC',
@@ -281,9 +277,17 @@ def Agent_Summary(all_df):
     # unique_agents = all_df['Agent'].unique()
     only_queue_agents = all_df.loc[all_df['Agent'].isin(unique_associates)]
 
+    cols = [
+    'Unique_RPC',
+    'Unique_PTP',
+    'Outbound_RPC',
+    'Outbound_PTP',
+    'Inbound_RPC',
+    'Inbound_PTP']
+
     if len(only_queue_agents['Agent'].dropna().unique()) < 1:
         logger.error("Cant summarize Agents...couldn't find agents in queues...often this means you have some issues with the bucket Associate and RPC Agent names")
-        return None
+        return pd.DataFrame(columns=cols)
     # print(any(all_df['Agent'].isin(all_df['Associate'].unique()) & ~all_df['Agent'].isnull()))
     summary_df = only_queue_agents.groupby(['Bucket','Agent','Date']).apply(lambda x: pd.Series(dict(
         Unique_RPC=x['RPC'].nunique(),
@@ -293,19 +297,20 @@ def Agent_Summary(all_df):
         Inbound_RPC=x['RPC'].loc[x['IB_OB']=='IB'].count(),
         Inbound_PTP=x['RPC'].loc[(x['IB_OB']=='IB') & (x['stripped']=='PP')].count())))
 
-    cols = [
-        'Unique_RPC',
-        'Unique_PTP',
-        'Outbound_RPC',
-        'Outbound_PTP',
-        'Inbound_RPC',
-        'Inbound_PTP']
-
+    # Re order
     summary_df = summary_df[cols]
-
-
-
     return summary_df
+# end%%
+
+# %% to csv
+def to_csv(df,output_header,tail):
+    write_fn = '{}_{}.csv'.format(output_header,tail)
+    logger.debug('Outputing CSV to : {}'.format(write_fn))
+
+    if len(df.index) < 1:
+        logger.error('The data frame for {} is empty...skipping ouput'.format(write_fn))
+    else:
+        df.to_csv(write_fn)
 # end%%
 
 # %% logger
@@ -359,11 +364,10 @@ def tk_open_file(title=None):
 # end%%
 
 # %%
-logger = customLogger('report',fn='process_reports.log',mode='a')
-sys.excepthook = log_uncaught_exceptions
 if __name__ == '__main__':
     #  Set up logger
-
+    logger = customLogger('report',fn='process_reports.log',mode='a')
+    sys.excepthook = log_uncaught_exceptions
     main()
 
 # end%%
