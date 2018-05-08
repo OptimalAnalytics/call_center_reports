@@ -1,3 +1,10 @@
+# %% Set Up Logger
+from colored_logger import customLogger
+logger = customLogger('report',fn='process_reports.log',mode='a')
+logger.debug('Loading libraries...this can take a minute depending on you computer speed.')
+# end%%
+
+
 # %% Import Base Packages
 import numpy as np
 import pandas as pd
@@ -6,7 +13,6 @@ import argparse
 import datetime
 import logging
 import traceback
-from colored_logger import customLogger
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
 # end%%
@@ -366,7 +372,6 @@ def tk_open_file(title=None):
 # %%
 if __name__ == '__main__':
     #  Set up logger
-    logger = customLogger('report',fn='process_reports.log',mode='a')
     sys.excepthook = log_uncaught_exceptions
     main()
 
