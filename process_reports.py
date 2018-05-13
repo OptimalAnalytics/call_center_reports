@@ -24,19 +24,7 @@ def main():
     logger.info('process_reports - STARTING SCRIPT')
 
     # Parse inputs
-    parser = argparse_logger(
-        description='Read in the main files to create RPC summary')
-
-    parser.add_argument('-r','--rpc_fn',metavar='RPC_INPUT_PATH',
-        type=is_valid_file,
-        help='Needs to be the full or relative path to the RPC excel file')
-    parser.add_argument('-b','--bucket_fn',metavar='BUCKET_INPUT_PATH',
-        type=is_valid_file,
-        help='Needs to be the full or relative path to the Buckets excel file')
-    parser.add_argument('-o','--output_fn',metavar='OUTPUT_FN_HEADER',type=str,
-        default='%s'%datetime.date.today().strftime('%Y_%m_%d'),
-        help='Output file location, defaults to YYYY_MM_DD_<DESCRIP>.csv')
-
+    parser = RPCArgParse()
     args = parser.parse_args()
 
     rpc_fn = get_input_file(args,'rpc_fn','RPC')
@@ -326,23 +314,8 @@ def log_uncaught_exceptions(ex_cls, ex, tb):
 
 # end%%
 
-# %% argparse overwriting
-class argparse_logger(argparse.ArgumentParser):
-    def _print_message(self, message, file=None):
-        if file is sys.stderr:
-            logger.warning('Arg Parse did something bad...see below:')
-            logger.error(message)
-        else:
-            super()._print_message(message,file=file)
-
-# end%%
-
 # %% Is valid file for arg parser
-def is_valid_file(arg):
-    if not os.path.exists(arg):
-        # parser.error("Cannot find the file: %s" % arg)
-        raise argparse.ArgumentTypeError("Specified file does not exist = {}".format(arg))
-    return arg
+
 # end%%
 
 # %% Open file if you don't want to specify in the command line
@@ -366,6 +339,49 @@ def tk_open_file(title=None):
         logger.critical('ABORTING SCRIPT')
         sys.exit(0)
     return filename
+
+# end%%
+
+# %% Arg parser
+class argparse_logger(argparse.ArgumentParser):
+    def _print_message(self, message, file=None):
+        if file is sys.stderr:
+            logger.warning('Arg Parse did something bad...see below:')
+            logger.error(message)
+        else:
+            super()._print_message(message,file=file)
+
+class RPCArgParse(argparse_logger):
+
+    def __init__(self,*args,**kwargs):
+
+        super().__init__(*args,**kwargs)
+
+        #Set default description...can be overridden
+        if not self.description:
+            self.description = 'Read in the main files to create RPC summary'
+
+        # Add the elements we want
+        self.add_CustomElements()
+
+    @staticmethod
+    def is_valid_file(arg):
+        if not os.path.exists(arg):
+            # parser.error("Cannot find the file: %s" % arg)
+            raise argparse.ArgumentTypeError("Specified file does not exist = {}".format(arg))
+        return arg
+
+
+    def add_CustomElements(self):
+        self.add_argument('-r','--rpc_fn',metavar='RPC_INPUT_PATH',
+            type=self.is_valid_file,
+            help='Needs to be the full or relative path to the RPC excel file')
+        self.add_argument('-b','--bucket_fn',metavar='BUCKET_INPUT_PATH',
+            type=self.is_valid_file,
+            help='Needs to be the full or relative path to the Buckets excel file')
+        self.add_argument('-o','--output_fn',metavar='OUTPUT_FN_HEADER',type=str,
+            default='%s'%datetime.date.today().strftime('%Y_%m_%d'),
+            help='Output file location, defaults to YYYY_MM_DD_<DESCRIP>.csv')
 
 # end%%
 
