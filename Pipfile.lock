@@ -1,10 +1,12 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "a6050b3a638b386ff46f54e75c473c34f4ff7e3ca181fd10235e0d8958528add"
+            "sha256": "437c8f55fa3a6cde1c7c413e7c556b2ba87463ef72533b00c3b75afe776ef43d"
         },
         "pipfile-spec": 6,
-        "requires": {},
+        "requires": {
+            "python_version": "3.6"
+        },
         "sources": [
             {
                 "name": "pypi",
@@ -14,9 +16,8 @@
         ]
     },
     "default": {
-        "15a9268": {
-            "editable": true,
-            "path": ".\\..\\colored_logger"
+        "colored-logger": {
+            "git": "https://github.com/eskemojoe007/colored_logger"
         },
         "numpy": {
             "hashes": [

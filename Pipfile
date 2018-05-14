@@ -7,10 +7,13 @@ name = "pypi"
 numpy = "*"
 pandas = "*"
 xlrd = "*"
-"15a9268" = {path = ".\\..\\colored_logger", editable = true}
+colored_logger = {git = "https://github.com/eskemojoe007/colored_logger"}
 
 [dev-packages]
 pyinstaller = "*"
 "pypiwin32" = "*"
 openpyxl = "*"
 pytest = "*"
+
+[requires]
+python_version = "3.6"
