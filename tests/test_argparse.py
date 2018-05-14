@@ -38,51 +38,29 @@ def test_is_valid_file(fn,is_file,rpcargparse):
 
 @pytest.mark.xpass(strict=True)
 def test_good_bucket(rpcargparse):
-    ''' We expect this to pass using xpass with a good filename
-    https://docs.pytest.org/en/documentation-restructure/how-to/skipping.html'''
+    '''
+    We expect this to pass using xpass with a good filename
+    https://docs.pytest.org/en/documentation-restructure/how-to/skipping.html
+    '''
     rpcargparse.parse_args(['-b',bucket_fn_data[0][0]])
 
-def test_bad_bucket(rpcargparse):
-    '''We expect a bad one to SystemExit with a value of 2 when a bad
-    file is used
-    https://medium.com/python-pandemonium/testing-sys-exit-with-pytest-10c6e5f7726f'''
+@pytest.mark.parametrize('parse',[['-b',bucket_fn_data[1][0]],['-o']])
+def test_bad_arg(parse,rpcargparse):
+    '''
+    These are tests we expect to fail, bad file, bad syntax etc.
+    https://medium.com/python-pandemonium/testing-sys-exit-with-pytest-10c6e5f7726f
+    '''
     with pytest.raises(SystemExit) as pytest_wrapped_e:
-        rpcargparse.parse_args(['-b',bucket_fn_data[1][0]])
+        rpcargparse.parse_args(parse)
 
     assert pytest_wrapped_e.type == SystemExit
     assert pytest_wrapped_e.value.code == 2
 
-def test_output_default_val1(rpcargparse):
-    args = rpcargparse.parse_args()
-    assert args.output_fn == '%s'%datetime.date.today().strftime('%Y_%m_%d')
-
-
-def test_output_default_val2(rpcargparse):
-    '''We expect a bad one to SystemExit with a value of 2 when a bad
-    file is used'''
-    with pytest.raises(SystemExit) as pytest_wrapped_e:
-        rpcargparse.parse_args(['-o'])
-
-    assert pytest_wrapped_e.type == SystemExit
-    assert pytest_wrapped_e.value.code == 2
-
-def test_output_default_val3(rpcargparse):
-    args = rpcargparse.parse_args(['-o','cool'])
-    assert args.output_fn == 'cool'
-
-def test_output_default_val4(rpcargparse):
-    args = rpcargparse.parse_args(['-o',''])
-    print(repr(args.output_fn))
-    assert args.output_fn == ''
-
-# @pytest.mark.parametrize("fn,is_file",bucket_fn_data)
-# def test_bucket_input(fn,is_file,rpcargparse):
-#     if not is_file:
-#         with pytest.raises(ArgumentError):
-#             rpcargparse.parse_args(['-b',fn])
-
-# @pytest.mark.parametrize("fn,is_file",bucket_fn_data)
-# def test_bucket_input1(fn,is_file,rpcargparse):
-#     if not is_file:
-#         with pytest.raises(ArgumentTypeError):
-#             rpcargparse.parse_args(['--bucket_fn',fn])
+@pytest.mark.parametrize("parse,key,expected",[
+    (None,'output_fn','%s'%datetime.date.today().strftime('%Y_%m_%d')),
+    (['-o','cool'],'output_fn','cool'),
+    (['-o',''],'output_fn',''),
+])
+def test_output_default_val(parse,key,expected,rpcargparse):
+    args = rpcargparse.parse_args(parse)
+    assert vars(args).get(key) == expected
