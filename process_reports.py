@@ -1,9 +1,7 @@
 # %% Set Up Logger
 from colored_logger import customLogger
 logger = customLogger('report',fn='process_reports.log',mode='a')
-logger.debug('Loading libraries...this can take a minute depending on you computer speed.')
 # end%%
-
 
 # %% Import Base Packages
 import numpy as np
@@ -95,6 +93,54 @@ def main():
 # end%%
 
 # %% Read sheets info
+def read_rpc(fn,f_type=None,skiprows=0,
+    converters={'Acct Id Acc':str},**kwargs):
+
+    return read_info(fn,f_type=f_type,skiprows=skiprows,
+        converters=converters,**kwargs)
+
+def read_info(fn,f_type=None,**kwargs):
+    # Check for excel type if f_type is empty
+    if not f_type:
+        if check_excel(fn):
+            f_type = 'excel'
+        else:
+            logger.error('read_info requires that you specify either a file that is an excel file or a f_type input.')
+            raise ValueError('Required excel filetype or f_type specified')
+
+    #Return for bad f_types
+    def unimplemented(f_type):
+        logger.error(
+            'in read_info, f_type of {} is not supported at this time...stopping'
+            .format(f_type.strip()))
+        raise NotImplementedError('read_info f_type - {} not implemented'.format(f_type))
+
+
+    # If excel...
+    if f_type.strip().lower() == 'excel':
+        if check_excel(fn):
+            logger.warning(('Ftype was specified as an excel file but, '
+            '{} is not an excel file...continuing, but may fail.'.format(
+            fn)))
+            return pd.read_excel(fn,**kwargs)
+    elif f_type.strip().lower() == 'csv':
+        unimplemented(f_type)
+    else:
+        unimplemented(f_type)
+
+
+def check_extension(fn,acceptable,case_insensitive=True):
+    _, ext = os.path.splitext(fn)
+
+    if case_insensitive:
+        acceptable = [x.lower() for x in acceptable]
+        ext = ext.lower()
+
+    return ext.replace('.','') in acceptable
+
+def check_excel(fn):
+    return check_extension(fn,['xls','xlsx','xlsb','xlsm'])
+
 def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq','Date'],
     queue_name='Associate'):
     logger.debug('Reading %s'%(sheet_name))
@@ -320,10 +366,8 @@ def log_uncaught_exceptions(ex_cls, ex, tb):
 
 # %% Open file if you don't want to specify in the command line
 def get_input_file(parsed_args,key,real_text=None):
-
     if real_text is None:
         real_text = key
-
     if vars(parsed_args)[key] is None:
         logger.debug('You didnt enter a file in the command line for %s...opening dialog'%(key))
         return tk_open_file('Select File for %s'%real_text)
