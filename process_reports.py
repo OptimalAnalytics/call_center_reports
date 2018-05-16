@@ -137,6 +137,11 @@ def check_excel(fn):
     return check_extension(fn,['xls','xlsx','xlsb','xlsm'])
 
 def read_buckets(bucket_fn):
+    if not check_excel(bucket_fn):
+        logger.warning('Bucket only supports excel filetypes. '
+            'Input file of {} is not known to be an excel type. '
+            'Continuing, but may have issues.'.format(bucket_fn))
+
     excel_bucket = pd.ExcelFile(bucket_fn)
 
     bucket_dfs = []
