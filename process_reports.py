@@ -31,7 +31,7 @@ def main():
 
     #Read in RPC file
     logger.debug('Reading in rpc data file: %s'%(rpc_fn))
-    rpc = pd.read_excel(rpc_fn,skiprows=0,converters={'Acct Id Acc':str})
+    rpc = read_rpc(rpc_fn)
 
     # Process some of the RPC data to make it more useful
     def ib_ob(action_type):
@@ -52,13 +52,8 @@ def main():
         sys.exit(0)
     #Get all the buckets
     logger.debug('Reading in bucket data file: %s'%(bucket_fn))
-    excel_bucket = pd.ExcelFile(bucket_fn)
+    buckets = read_buckets(bucket_fn)
 
-    bucket_dfs = []
-    for sheet in excel_bucket.sheet_names:
-        bucket_dfs.append(read_bucket_sheet(sheet,excel_bucket))
-
-    buckets = pd.concat(bucket_dfs,ignore_index=True)
 
     # Remove any entry with a missing acct_num...these will likely be bad skiprows
     # it does remoe any empty sheets however
@@ -118,11 +113,11 @@ def read_info(fn,f_type=None,**kwargs):
 
     # If excel...
     if f_type.strip().lower() == 'excel':
-        if check_excel(fn):
+        if not check_excel(fn):
             logger.warning(('Ftype was specified as an excel file but, '
             '{} is not an excel file...continuing, but may fail.'.format(
             fn)))
-            return pd.read_excel(fn,**kwargs)
+        return pd.read_excel(fn,**kwargs)
     elif f_type.strip().lower() == 'csv':
         unimplemented(f_type)
     else:
@@ -140,6 +135,16 @@ def check_extension(fn,acceptable,case_insensitive=True):
 
 def check_excel(fn):
     return check_extension(fn,['xls','xlsx','xlsb','xlsm'])
+
+def read_buckets(bucket_fn):
+    excel_bucket = pd.ExcelFile(bucket_fn)
+
+    bucket_dfs = []
+    for sheet in excel_bucket.sheet_names:
+        bucket_dfs.append(read_bucket_sheet(sheet,excel_bucket))
+
+    buckets = pd.concat(bucket_dfs,ignore_index=True)
+    return buckets
 
 def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq','Date'],
     queue_name='Associate'):
@@ -178,6 +183,13 @@ def read_bucket_sheet(sheet_name, excel_file,global_names = ['Acct_Num','Delinq'
         df = excel_file.parse(
             sheet_name=sheet_name,skiprows=skiprows,
             converters={cols[0]:str,cols[-1]:pd.to_datetime})
+
+    #Check to make sure we found all the columns
+    for col in cols:
+        if not col in df.columns:
+            logger.error('Could not find specified col - "{}" in inputs.  Known columns are {}...exiting'
+                .format(col,df.columns.values))
+            raise KeyError("['{}'] not in index".format(col))
 
     # Fill in queuename with nans if it doesn't exist
     if not queue_name in df.columns:
