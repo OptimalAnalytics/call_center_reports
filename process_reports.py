@@ -32,6 +32,9 @@ def main():
     #Read in RPC file
     logger.debug('Reading in rpc data file: %s'%(rpc_fn))
     rpc = read_rpc(rpc_fn)
+    #Get all the buckets
+    logger.debug('Reading in bucket data file: %s'%(bucket_fn))
+    buckets = read_buckets(bucket_fn)
 
     # Process some of the RPC data to make it more useful
     def ib_ob(action_type):
@@ -50,9 +53,6 @@ def main():
         logger.error('Couldn"t find the key: "%s" in the RPC file: %s.  You may have input the wrong file or the file may be corrupt'%(e.args[0],rpc_fn))
         logger.critical('ABORTING SCRIPT')
         sys.exit(0)
-    #Get all the buckets
-    logger.debug('Reading in bucket data file: %s'%(bucket_fn))
-    buckets = read_buckets(bucket_fn)
 
 
     # Remove any entry with a missing acct_num...these will likely be bad skiprows
