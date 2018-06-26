@@ -584,4 +584,4 @@ class RPCArgParse(argparse_logger):
 if __name__ == '__main__':
     #  Set up logger
     sys.excepthook = log_uncaught_exceptions
-    main(sys.argv[1:])
+    main()
