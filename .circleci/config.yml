@@ -3,7 +3,7 @@ jobs:
   build:
     working_directory: ~/repo
     docker:
-      - image: circleci/python:3.6.5-32
+      - image: circleci/python:3.6.5
         environment:
           PIPENV_VENV_IN_PROJECT: true
     steps:
@@ -16,7 +16,7 @@ jobs:
           name: install python dependencies
           command: |
             sudo pip install pipenv
-            pipenv install --dev
+            pipenv install
       - save_cache:
           key: deps9-{{ .Branch }}-{{ checksum "Pipfile.lock" }}
           paths:
