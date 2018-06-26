@@ -15,7 +15,6 @@ def bucket_fn():
 
 
 def test_default(rpc_fn, bucket_fn):
-
     # Run the main
     main(['-r', rpc_fn, '-b', bucket_fn, '-o', os.path.join('tests', 'test_out')])
 
