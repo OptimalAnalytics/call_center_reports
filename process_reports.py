@@ -52,7 +52,6 @@ def main(argv=None):
     fill_all_bool(all_df, ['GC', 'CR', 'HD'], default=False)
 
     # Summarize and output
-    print(all_df.head(10))
     logger.debug('summarizing data...')
     rpc_summary_df = rpc_summary(all_df)
     to_csv(rpc_summary_df, output_fn, 'RPC_Summary')
