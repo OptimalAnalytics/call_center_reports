@@ -1,8 +1,4 @@
-# %% Set Up Logger
 from colored_logger import customLogger
-# end%%
-
-# %% Import Base Packages
 import numpy as np
 import pandas as pd
 import sys
@@ -13,17 +9,19 @@ import traceback
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
 logger = customLogger('report', fn='process_reports.log', mode='a')
-# end%%
 
 
-# %% main
-def main():
+def main(argv=None):
+    '''
+    runs the primary section of code for this process leaning heavily
+    on the support functions
+    '''
 
     logger.info('process_reports - STARTING SCRIPT')
 
     # Parse inputs
     parser = RPCArgParse()
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     rpc_fn = get_input_file(args, 'rpc_fn', 'RPC')
     bucket_fn = get_input_file(args, 'bucket_fn', 'Buckets')
@@ -32,51 +30,29 @@ def main():
     # Read in RPC file
     logger.debug('Reading in rpc data file: %s' % (rpc_fn))
     rpc = read_rpc(rpc_fn)
+    rpc = process_rpc(rpc)
 
     # Get all the buckets
     logger.debug('Reading in bucket data file: %s' % (bucket_fn))
     buckets = read_buckets(bucket_fn)
 
-    # Process some of the RPC data to make it more useful
-    def ib_ob(action_type):
-        if action_type.upper().startswith('T'):
-            return 'OB'
-        else:
-            return 'IB'
-    try:
-        rpc['IB_OB'] = rpc['Call Action Type Qcc'].apply(ib_ob)
-
-        rpc['stripped'] = rpc['Call Result Type Qcc'].apply(lambda x: x[:2])
-        rpc['GC'] = rpc['Created By Qcc'].apply(lambda x: x[:2])
-        rpc.rename(columns={'Created By Qcc': 'Agent'}, inplace=True)
-    except KeyError as e:
-        # logger.exception("message")
-        logger.error('Couldn"t find the key: "%s" in the RPC file: %s. '
-                     'You may have input the wrong file or the file may '
-                     'be corrupt' % (e.args[0], rpc_fn))
-        logger.critical('ABORTING SCRIPT')
-        sys.exit(0)
-
     # Remove any entry with a missing acct_num...these will likely be bad
     # skiprows it does remoe any empty sheets however
     buckets.dropna(subset=['Acct_Num'], inplace=True)
-
-    # Check the BUCKETS
-    if any(buckets.duplicated(subset=['Acct_Num'])):
-        logger.waring(
-            'You had a duplicate account number...that doesnt make a lot '
-            'of sense')
-        logger.warning(buckets.loc[buckets.duplicated(subset=['Acct_Num'])])
+    check_bucket_duplicates(buckets)
 
     # Merge the two together
     logger.debug('merging bucket and rpc information')
     all_df = pd.merge(buckets,
-                      rpc[['Acct Id Acc', 'IB_OB', 'stripped', 'GC', 'Agent']],
+                      rpc[['Acct Id Acc', 'IB_OB', 'stripped',
+                           'GC', 'CR', 'HD', 'Agent']],
                       how='outer', left_on='Acct_Num', right_on='Acct Id Acc')
 
     all_df.rename(columns={'Acct Id Acc': 'RPC'}, inplace=True)
+    fill_all_bool(all_df, ['GC', 'CR', 'HD'], default=False)
 
     # Summarize and output
+    print(all_df.head(10))
     logger.debug('summarizing data...')
     rpc_summary_df = rpc_summary(all_df)
     to_csv(rpc_summary_df, output_fn, 'RPC_Summary')
@@ -89,19 +65,22 @@ def main():
 
     logger.info('Ending Script successfully')
 
-# end%%
-
-# %% Read sheets info
-
 
 def read_rpc(fn, f_type=None, skiprows=0,
              converters={'Acct Id Acc': str}, **kwargs):
+    '''
+    wrapper function for reading in RPC excel document
+    '''
 
     return read_info(fn, f_type=f_type, skiprows=skiprows,
                      converters=converters, **kwargs)
 
 
 def read_info(fn, f_type=None, **kwargs):
+    '''
+    Reads an file
+    '''
+
     # Check for excel type if f_type is empty
     if not f_type:
         if check_excel(fn):
@@ -134,6 +113,9 @@ def read_info(fn, f_type=None, **kwargs):
 
 
 def check_extension(fn, acceptable, case_insensitive=True):
+    '''
+    Checks to see the filename matches the list of acceptable extensions
+    '''
     _, ext = os.path.splitext(fn)
 
     if case_insensitive:
@@ -144,10 +126,55 @@ def check_extension(fn, acceptable, case_insensitive=True):
 
 
 def check_excel(fn):
+    '''
+    Wrapper function for check_extension that looks for different excel extentions
+    '''
     return check_extension(fn, ['xls', 'xlsx', 'xlsb', 'xlsm'])
 
 
+def process_rpc(rpc_df):
+    '''
+    rpc_df is the read in rpc dataframe.  We add columns and extract information
+    from the given information using several rules
+    '''
+
+    def ib_ob(action_type):
+        if action_type.strip().upper().startswith('T'):
+            return 'OB'
+        else:
+            return 'IB'
+
+    try:
+        rpc_df['IB_OB'] = rpc_df['Call Action Type Qcc'].apply(ib_ob)
+
+        rpc_df['stripped'] = rpc_df['Call Result Type Qcc'].apply(
+            lambda x: x[:2])
+
+        rpc_df['GC'] = rpc_df['Created By Qcc'].apply(
+            lambda x: x.strip().lower().startswith('gc'))
+
+        rpc_df['CR'] = rpc_df['Created By Qcc'].apply(
+            lambda x: x.strip().lower().startswith('cr'))
+
+        rpc_df['HD'] = rpc_df.apply(lambda x: not (x['GC'] or x['CR']), axis=1)
+
+        rpc_df.rename(columns={'Created By Qcc': 'Agent'}, inplace=True)
+    except KeyError as e:
+        logger.error('Couldn"t find the key: "%s" in the RPC file. '
+                     'You may have input the wrong file or the file may '
+                     'be corrupt' % (e.args[0]))
+        logger.critical('ABORTING SCRIPT')
+        sys.exit(42)
+
+    return rpc_df
+
+
 def read_buckets(bucket_fn):
+    '''
+    Read_buckets reads in the different bucket sheets, using read_bucket_sheet
+    and returns a concatenated bucket list
+    '''
+
     if not check_excel(bucket_fn):
         logger.warning('Bucket only supports excel filetypes. '
                        'Input file of {} is not known to be an excel type. '
@@ -166,6 +193,10 @@ def read_buckets(bucket_fn):
 def read_bucket_sheet(sheet_name, excel_file,
                       global_names=['Acct_Num', 'Delinq', 'Date'],
                       queue_name='Associate'):
+    '''
+    Reads in a given sheet name using some known and default patterns.
+    Returns a dataFrame of the information gathered.
+    '''
     logger.debug('Reading %s' % (sheet_name))
     if sheet_name in ['60 Day',
                       'Mid GC',
@@ -229,9 +260,20 @@ def read_bucket_sheet(sheet_name, excel_file,
 
     return df[global_names + [queue_name] + ['Bucket']]
 
-# end%%
 
-# %%
+def check_bucket_duplicates(buckets_df):
+    if any(buckets_df.duplicated(subset=['Acct_Num'])):
+        logger.warning(
+            'You had a duplicate account number...that doesnt make a lot '
+            'of sense')
+        logger.warning(
+            buckets_df.loc[buckets_df.duplicated(subset=['Acct_Num'])])
+
+
+def fill_all_bool(df, cols, default=False):
+    for col in cols:
+        df[col] = df[col].fillna(default)
+    return df
 
 
 def rpc_summary(all_df):
@@ -248,27 +290,38 @@ def rpc_summary(all_df):
             Inbound_RPC=x['RPC'].loc[x['IB_OB'] == 'IB'].count(),
             Inbound_PTP=x['RPC'].loc[(x['IB_OB'] == 'IB') & (
                 x['stripped'] == 'PP')].count(),
-            HD_RPC=x['RPC'].loc[x['GC'] != 'GC'].count(),
-            HD_PTP=x['RPC'].loc[(x['GC'] != 'GC') & (
+            HD_RPC=x['RPC'].loc[x['HD']].count(),
+            HD_PTP=x['RPC'].loc[(x['HD']) & (
                 x['stripped'] == 'PP')].count(),
-            HD_OB_RPC=x['RPC'].loc[(x['GC'] != 'GC') & (
+            HD_OB_RPC=x['RPC'].loc[(x['HD']) & (
                 x['IB_OB'] == 'OB')].count(),
-            HD_OB_PTP=x['RPC'].loc[(x['GC'] != 'GC') & (
+            HD_OB_PTP=x['RPC'].loc[(x['HD']) & (
                 x['stripped'] == 'PP') & (x['IB_OB'] == 'OB')].count(),
-            HD_IB_RPC=x['RPC'].loc[(x['GC'] != 'GC') & (
+            HD_IB_RPC=x['RPC'].loc[(x['HD']) & (
                 x['IB_OB'] == 'IB')].count(),
-            HD_IB_PTP=x['RPC'].loc[(x['GC'] != 'GC') & (
+            HD_IB_PTP=x['RPC'].loc[(x['HD']) & (
                 x['stripped'] == 'PP') & (x['IB_OB'] == 'IB')].count(),
-            GC_RPC=x['RPC'].loc[x['GC'] == 'GC'].count(),
-            GC_PTP=x['RPC'].loc[(x['GC'] == 'GC') & (
+            GC_RPC=x['RPC'].loc[x['GC']].count(),
+            GC_PTP=x['RPC'].loc[(x['GC']) & (
                 x['stripped'] == 'PP')].count(),
-            GC_OB_RPC=x['RPC'].loc[(x['GC'] == 'GC') & (
+            GC_OB_RPC=x['RPC'].loc[(x['GC']) & (
                 x['IB_OB'] == 'OB')].count(),
-            GC_OB_PTP=x['RPC'].loc[(x['GC'] == 'GC') & (
+            GC_OB_PTP=x['RPC'].loc[(x['GC']) & (
                 x['stripped'] == 'PP') & (x['IB_OB'] == 'OB')].count(),
-            GC_IB_RPC=x['RPC'].loc[(x['GC'] == 'GC') & (
+            GC_IB_RPC=x['RPC'].loc[(x['GC']) & (
                 x['IB_OB'] == 'IB')].count(),
-            GC_IB_PTP=x['RPC'].loc[(x['GC'] == 'GC') & (
+            GC_IB_PTP=x['RPC'].loc[(x['GC']) & (
+                x['stripped'] == 'PP') & (x['IB_OB'] == 'IB')].count(),
+            CR_RPC=x['RPC'].loc[x['CR']].count(),
+            CR_PTP=x['RPC'].loc[(x['CR']) & (
+                x['stripped'] == 'PP')].count(),
+            CR_OB_RPC=x['RPC'].loc[(x['CR']) & (
+                x['IB_OB'] == 'OB')].count(),
+            CR_OB_PTP=x['RPC'].loc[(x['CR']) & (
+                x['stripped'] == 'PP') & (x['IB_OB'] == 'OB')].count(),
+            CR_IB_RPC=x['RPC'].loc[(x['CR']) & (
+                x['IB_OB'] == 'IB')].count(),
+            CR_IB_PTP=x['RPC'].loc[(x['CR']) & (
                 x['stripped'] == 'PP') & (x['IB_OB'] == 'IB')].count(),
         )))
 
@@ -301,7 +354,13 @@ def rpc_summary(all_df):
         'GC_OB_RPC',
         'GC_OB_PTP',
         'GC_IB_RPC',
-        'GC_IB_PTP']
+        'GC_IB_PTP',
+        'CR_RPC',
+        'CR_PTP',
+        'CR_OB_RPC',
+        'CR_OB_PTP',
+        'CR_IB_RPC',
+        'CR_IB_PTP']
 
     summary_df = summary_df[cols]
 
@@ -322,27 +381,38 @@ def Queue_Summary(all_df):
             Inbound_RPC=x['RPC'].loc[x['IB_OB'] == 'IB'].count(),
             Inbound_PTP=x['RPC'].loc[(x['IB_OB'] == 'IB') & (
                 x['stripped'] == 'PP')].count(),
-            HD_RPC=x['RPC'].loc[x['GC'] != 'GC'].count(),
-            HD_PTP=x['RPC'].loc[(x['GC'] != 'GC') & (
+            HD_RPC=x['RPC'].loc[x['HD']].count(),
+            HD_PTP=x['RPC'].loc[(x['HD']) & (
                 x['stripped'] == 'PP')].count(),
-            HD_OB_RPC=x['RPC'].loc[(x['GC'] != 'GC') & (
+            HD_OB_RPC=x['RPC'].loc[(x['HD']) & (
                 x['IB_OB'] == 'OB')].count(),
-            HD_OB_PTP=x['RPC'].loc[(x['GC'] != 'GC') & (
+            HD_OB_PTP=x['RPC'].loc[(x['HD']) & (
                 x['stripped'] == 'PP') & (x['IB_OB'] == 'OB')].count(),
-            HD_IB_RPC=x['RPC'].loc[(x['GC'] != 'GC') & (
+            HD_IB_RPC=x['RPC'].loc[(x['HD']) & (
                 x['IB_OB'] == 'IB')].count(),
-            HD_IB_PTP=x['RPC'].loc[(x['GC'] != 'GC') & (
+            HD_IB_PTP=x['RPC'].loc[(x['HD']) & (
                 x['stripped'] == 'PP') & (x['IB_OB'] == 'IB')].count(),
-            GC_RPC=x['RPC'].loc[x['GC'] == 'GC'].count(),
-            GC_PTP=x['RPC'].loc[(x['GC'] == 'GC') & (
+            GC_RPC=x['RPC'].loc[x['GC']].count(),
+            GC_PTP=x['RPC'].loc[(x['GC']) & (
                 x['stripped'] == 'PP')].count(),
-            GC_OB_RPC=x['RPC'].loc[(x['GC'] == 'GC') & (
+            GC_OB_RPC=x['RPC'].loc[(x['GC']) & (
                 x['IB_OB'] == 'OB')].count(),
-            GC_OB_PTP=x['RPC'].loc[(x['GC'] == 'GC') & (
+            GC_OB_PTP=x['RPC'].loc[(x['GC']) & (
                 x['stripped'] == 'PP') & (x['IB_OB'] == 'OB')].count(),
-            GC_IB_RPC=x['RPC'].loc[(x['GC'] == 'GC') & (
+            GC_IB_RPC=x['RPC'].loc[(x['GC']) & (
                 x['IB_OB'] == 'IB')].count(),
-            GC_IB_PTP=x['RPC'].loc[(x['GC'] == 'GC') & (
+            GC_IB_PTP=x['RPC'].loc[(x['GC']) & (
+                x['stripped'] == 'PP') & (x['IB_OB'] == 'IB')].count(),
+            CR_RPC=x['RPC'].loc[x['CR']].count(),
+            CR_PTP=x['RPC'].loc[(x['CR']) & (
+                x['stripped'] == 'PP')].count(),
+            CR_OB_RPC=x['RPC'].loc[(x['CR']) & (
+                x['IB_OB'] == 'OB')].count(),
+            CR_OB_PTP=x['RPC'].loc[(x['CR']) & (
+                x['stripped'] == 'PP') & (x['IB_OB'] == 'OB')].count(),
+            CR_IB_RPC=x['RPC'].loc[(x['CR']) & (
+                x['IB_OB'] == 'IB')].count(),
+            CR_IB_PTP=x['RPC'].loc[(x['CR']) & (
                 x['stripped'] == 'PP') & (x['IB_OB'] == 'IB')].count(),
         )))
 
@@ -375,7 +445,14 @@ def Queue_Summary(all_df):
         'GC_OB_RPC',
         'GC_OB_PTP',
         'GC_IB_RPC',
-        'GC_IB_PTP']
+        'GC_IB_PTP',
+        'CR_RPC',
+        'CR_PTP',
+        'CR_OB_RPC',
+        'CR_OB_PTP',
+        'CR_IB_RPC',
+        'CR_IB_PTP',
+        ]
 
     summary_df = summary_df[cols]
 
@@ -415,9 +492,6 @@ def Agent_Summary(all_df):
     # Re order
     summary_df = summary_df[cols]
     return summary_df
-# end%%
-
-# %% to csv
 
 
 def to_csv(df, output_header, tail):
@@ -429,22 +503,11 @@ def to_csv(df, output_header, tail):
             'The data frame for {} is empty...skipping ouput'.format(write_fn))
     else:
         df.to_csv(write_fn)
-# end%%
-
-# %% logger
 
 
 def log_uncaught_exceptions(ex_cls, ex, tb):
     logger.critical(''.join(traceback.format_tb(tb)))
     logger.critical('{0}: {1}'.format(ex_cls, ex))
-
-# end%%
-
-# %% Is valid file for arg parser
-
-# end%%
-
-# %% Open file if you don't want to specify in the command line
 
 
 def get_input_file(parsed_args, key, real_text=None):
@@ -469,10 +532,6 @@ def tk_open_file(title=None):
         logger.critical('ABORTING SCRIPT')
         sys.exit(0)
     return filename
-
-# end%%
-
-# %% Arg parser
 
 
 class argparse_logger(argparse.ArgumentParser):
@@ -521,13 +580,8 @@ class RPCArgParse(argparse_logger):
                           help='Output file location, '
                           'defaults to YYYY_MM_DD_<DESCRIP>.csv')
 
-# end%%
 
-
-# %%
 if __name__ == '__main__':
     #  Set up logger
     sys.excepthook = log_uncaught_exceptions
-    main()
-
-# end%%
+    main(sys.argv[1:])
