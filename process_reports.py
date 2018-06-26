@@ -32,6 +32,7 @@ def main():
     # Read in RPC file
     logger.debug('Reading in rpc data file: %s' % (rpc_fn))
     rpc = read_rpc(rpc_fn)
+
     # Get all the buckets
     logger.debug('Reading in bucket data file: %s' % (bucket_fn))
     buckets = read_buckets(bucket_fn)
