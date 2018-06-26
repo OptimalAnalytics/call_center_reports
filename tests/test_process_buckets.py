@@ -3,13 +3,8 @@ from process_reports import read_buckets, check_bucket_duplicates
 import os
 
 
-@pytest.fixture
-def good_bucket():
-    return read_buckets(os.path.join('Sample_Reports', '2_1_18Bucket_Scrubbed.xls'))
-
-
-def test_bad_key(good_bucket, caplog):
-    df = good_bucket.copy()
+def test_bad_key(caplog):
+    df = read_buckets(os.path.join('Sample_Reports', '2_1_18Bucket_Scrubbed.xls'))
     df.loc['Acct_Num', -1] = df['Acct_Num'].iloc[-2]
 
     # with pytest.raises(SystemExit) as pytest_wrapped_e:
