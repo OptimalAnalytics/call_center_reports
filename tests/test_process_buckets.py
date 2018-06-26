@@ -5,7 +5,8 @@ import os
 
 def test_bad_key(caplog):
     df = read_buckets(os.path.join('Sample_Reports', '2_1_18Bucket_Scrubbed.xls'))
-    df.loc['Acct_Num', -1] = df['Acct_Num'].iloc[-2]
+    df.dropna(subset=['Acct_Num'], inplace=True)
+    df.loc[df.iloc[-1].name, 'Acct_Num'] = df['Acct_Num'].iloc[-2]
 
     # with pytest.raises(SystemExit) as pytest_wrapped_e:
     check_bucket_duplicates(df)
