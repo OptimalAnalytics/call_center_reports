@@ -27,7 +27,7 @@ jobs:
           name: run unittests
           command: |
             mkdir test-reports
-            pipenv run "python -m pytest"
+            pipenv run python -m pytest
       - store_test_results:
           path: test-reports
       - store_artifacts:
