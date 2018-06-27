@@ -2,7 +2,10 @@ import pytest
 from process_reports import read_rpc, check_excel, check_extension, read_info
 import os
 
-good_fn = os.path.join('Sample_Reports', 'ALL_RPC-2-1-2018_Scrubbed.xlsx')
+
+@pytest.fixture
+def good_fn():
+    return os.path.join('Sample_Reports', 'ALL_RPC-2-1-2018_Scrubbed.xlsx')
 
 
 @pytest.mark.parametrize("fn,acceptable,case,expected", [
@@ -36,7 +39,7 @@ def test_check_excel(fn, expected):
 
 
 @pytest.mark.parametrize("f_type", ['csv', 'ini'])
-def test_bad_f_types(caplog, f_type):
+def test_bad_f_types(good_fn, caplog, f_type):
     with pytest.raises(NotImplementedError):
         read_info(good_fn, f_type=f_type)
     for record in caplog.records:
@@ -53,12 +56,15 @@ def test_bad_f_type_file(caplog):
         assert record.levelname == 'ERROR'
 
 
-def test_good_file():
+def test_good_file(good_fn):
     df = read_rpc(good_fn)
     assert 'Created By Qcc' in df.columns.values
     assert 'Acct Id Acc' in df.columns.values
+    assert 'Call Action Type Qcc' in df.columns.values
+    assert 'Call Result Type Qcc' in df.columns.values
 
 
-def test_kwargs():
+def test_kwargs(good_fn):
     df = read_rpc(good_fn, usecols=2)
     assert 'Call Result Type Qcc' not in df.columns.values
+    assert len(df.columns.values) == 3

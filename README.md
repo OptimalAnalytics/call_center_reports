@@ -1,4 +1,5 @@
 # Call Center Reports
+[![CircleCI](https://circleci.com/gh/eskemojoe007/call_center_reports.svg?style=svg)](https://circleci.com/gh/eskemojoe007/call_center_reports)
 This project is designed to showcase how pandas and pyinstaller can be used
 to drastically reduce processing time of call center reporting.
 

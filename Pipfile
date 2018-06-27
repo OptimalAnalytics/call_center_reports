@@ -8,12 +8,11 @@ numpy = "*"
 pandas = "*"
 xlrd = "*"
 colored_logger = {git = "https://github.com/eskemojoe007/colored_logger"}
+pytest = "*"
 
 [dev-packages]
 pyinstaller = "*"
 "pypiwin32" = "*"
-openpyxl = "*"
-pytest = "*"
 
 [requires]
 python_version = "3.6"
