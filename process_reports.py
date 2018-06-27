@@ -265,8 +265,8 @@ def check_bucket_duplicates(buckets_df):
         logger.warning(
             'You had a duplicate account number...that doesnt make a lot '
             'of sense')
-        logger.warning(
-            buckets_df.loc[buckets_df.duplicated(subset=['Acct_Num'])])
+        logger.warning('Duplicate Accounts: {}'.format(
+            buckets_df['Acct_Num'].loc[buckets_df.duplicated(subset=['Acct_Num'])].unique()))
 
 
 def fill_all_bool(df, cols, default=False):
