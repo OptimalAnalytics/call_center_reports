@@ -3,6 +3,6 @@ Katie Report UIPATH
 build
 dist
 __pycache__
-*.csv
 *.log
 Real_Reports
+.pytest_cache
