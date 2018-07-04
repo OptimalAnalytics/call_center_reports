@@ -6,6 +6,7 @@ import logging
 import numpy as np
 
 good_bucket = os.path.join('Sample_Reports', '2_1_18Bucket_Scrubbed.xls')
+updated_bucket = os.path.join('Sample_Reports', 'Daily_Queues_by_Bucket.7.3.18_Scrubbed.xls')
 mixed_bucket = os.path.join('tests', '2_1_18Bucket_Scrubbed_Tester_sheets.xls')
 
 
@@ -76,8 +77,9 @@ def test_no_date_format(caplog, mixed_excel):
     assert 'Read buckets failed' in caplog.text
 
 
-def test_working_file():
-    df = read_buckets(good_bucket)
+@pytest.mark.parametrize('fn', [good_bucket, updated_bucket])
+def test_working_file(fn):
+    df = read_buckets(fn)
     assert len(df.loc[df['Bucket'] == 'Can 31+'].index) > 1
     assert np.issubdtype(df['Date'], np.datetime64)
     # assert df['Date'].dtype == np.datetime64

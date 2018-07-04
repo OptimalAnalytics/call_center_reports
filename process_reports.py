@@ -65,14 +65,23 @@ def main(argv=None):
     logger.info('Ending Script successfully')
 
 
-def read_rpc(fn, f_type=None, skiprows=0,
-             converters={'Acct Id Acc': str}, **kwargs):
+def read_rpc(fn, f_type=None, converters={'Acct Id Acc': str}, **kwargs):
     '''
     wrapper function for reading in RPC excel document
     '''
 
-    return read_info(fn, f_type=f_type, skiprows=skiprows,
-                     converters=converters, **kwargs)
+    # Read in the raw dataframe with basic formatting tips
+    df_raw = read_info(fn, converters=converters, ftype=f_type, header=None, **kwargs)
+    df_raw.dropna(axis=1, how='all', inplace=True)
+
+    # https://stackoverflow.com/questions/47039309/dynamically-skip-top-blank-rows-of-excel-in-python-pandas
+    for i, row in df_raw.iterrows():
+        if row.notnull().all():
+            data = df_raw.iloc[(i+1):].reset_index(drop=True)
+            data.columns = list(df_raw.iloc[i])
+            break
+    # TODO: Check to make sure that we can convert to string
+    return data
 
 
 def read_info(fn, f_type=None, **kwargs):
@@ -136,6 +145,8 @@ def process_rpc(rpc_df):
     rpc_df is the read in rpc dataframe.  We add columns and extract information
     from the given information using several rules
     '''
+
+    rpc_df = rpc_df.fillna('')
 
     def ib_ob(action_type):
         if action_type.strip().upper().startswith('T'):

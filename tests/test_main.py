@@ -5,21 +5,31 @@ import pandas as pd
 
 
 @pytest.fixture
-def rpc_fn():
-    return os.path.join('Sample_Reports', 'ALL_RPC-2-1-2018_Scrubbed.xlsx')
+def rpc_fn(request):
+    if request.param == 1:
+        return os.path.join('Sample_Reports', 'ALL_RPC-2-1-2018_Scrubbed.xlsx')
+    elif request.param == 2:
+        return os.path.join('Sample_Reports', 'ALL_RPC-7-3_2018_Scrubbed.xlsx')
 
 
 @pytest.fixture
-def bucket_fn():
-    return os.path.join('Sample_Reports', '2_1_18Bucket_Scrubbed.xls')
+def bucket_fn(request):
+    if request.param == 1:
+        return os.path.join('Sample_Reports', '2_1_18Bucket_Scrubbed.xls')
+    elif request.param == 2:
+        return os.path.join('Sample_Reports', 'Daily_Queues_by_Bucket.7.3.18_Scrubbed.xls')
 
 
-def test_default(rpc_fn, bucket_fn):
+@pytest.mark.parametrize('rpc_fn,bucket_fn,header', [
+    (1, 1, 'Sample1'),
+    (2, 2, 'Sample2'),
+    ], indirect=['rpc_fn', 'bucket_fn'])
+def test_default(rpc_fn, bucket_fn, header):
     # Run the main
     main(['-r', rpc_fn, '-b', bucket_fn, '-o', os.path.join('tests', 'test_out')])
 
     # Read in the files to ensure it is working
-    good = 'Sample'
+    good = header
 
     files = ['Agent_Summary.csv', 'Queue_Summary.csv', 'RPC_Summary.csv']
 
