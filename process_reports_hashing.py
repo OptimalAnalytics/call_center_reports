@@ -7,12 +7,12 @@ logger = customLogger('root')
 # end%%
 
 # %% Get inputs
-rpc_fn = os.path.join('Sample_Reports', 'ALL_RPC-2-1-2018.xlsx')
-bucket_fn = os.path.join('Sample_Reports', '2_1_18Bucket.xls')
+rpc_fn = os.path.join('Real_Reports', 'ALL_RPC-7-3_2018.xlsx')
+bucket_fn = os.path.join('Real_Reports', 'Daily_Queues_by_Bucket.7.3.18.xls')
 # end%%
 
 # %%
-rpc = pd.read_excel(rpc_fn, skiprows=0, converters={'Acct Id Acc': str})
+rpc = pd.read_excel(rpc_fn, skiprows=3, converters={'Acct Id Acc': str})
 # end%%
 
 # %% Get Bucket file
@@ -43,8 +43,8 @@ d = all_act['Acct_Num_new'].to_dict()
 rpc['Acct Id Acc'] = rpc['Acct Id Acc'].apply(lambda x: d[x])
 buckets['Acct_Num'] = buckets['Acct_Num'].map(lambda x: d[x])
 
-any(buckets['Acct_Num'].isnull())
-any(rpc['Acct Id Acc'].isnull())
+# any(buckets['Acct_Num'].isnull())
+# any(rpc['Acct Id Acc'].isnull())
 # end%%
 
 # %% Now we need to do the same with the agent names
@@ -66,10 +66,10 @@ agents
 rpc['Created By Qcc'] = rpc['Created By Qcc'].map(agents['Agents_new'])
 buckets['Associate'] = buckets['Associate'].map(agents['Agents_new'])
 
-any(rpc['Created By Qcc'].isnull())
-any(buckets['Associate'].isnull())
-
-buckets['Associate'].unique()
+# any(rpc['Created By Qcc'].isnull())
+# any(buckets['Associate'].isnull())
+#
+# buckets['Associate'].unique()
 # end%%
 
 # %% REmove all bucket associates
@@ -89,8 +89,8 @@ buckets['Associate'].unique()
 
 # %% Write RPC to file
 rpc.to_excel(os.path.join('Sample_Reports',
-                          'ALL_RPC-2-1-2018_Scrubbed.xlsx'), index=False)
+                          'ALL_RPC-7-3_2018_Scrubbed.xlsx'), index=False)
 # end%%
 
 buckets.to_excel(os.path.join('Sample_Reports',
-                              'Buckets_Scrubbed_temp.xlsx'), index=False)
+                              'Daily_Queues_by_Bucket.7.3.18.xlsx'), index=False)
