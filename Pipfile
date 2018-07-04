@@ -13,6 +13,8 @@ pytest = "*"
 [dev-packages]
 pyinstaller = "*"
 "pypiwin32" = "*"
+ipython = "*"
+openpyxl = "*"
 
 [requires]
 python_version = "3.6"

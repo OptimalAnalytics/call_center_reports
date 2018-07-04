@@ -8,6 +8,11 @@ def good_fn():
     return os.path.join('Sample_Reports', 'ALL_RPC-2-1-2018_Scrubbed.xlsx')
 
 
+@pytest.fixture
+def updated_fn():
+    return os.path.join('Sample_Reports', 'ALL_RPC-7-3_2018_Scrubbed.xlsx')
+
+
 @pytest.mark.parametrize("fn,acceptable,case,expected", [
     ('cool.txt', ['txt', 'xls'], True, True),
     ('cool.ini', ['txt', 'xls'], True, False),
@@ -58,6 +63,14 @@ def test_bad_f_type_file(caplog):
 
 def test_good_file(good_fn):
     df = read_rpc(good_fn)
+    assert 'Created By Qcc' in df.columns.values
+    assert 'Acct Id Acc' in df.columns.values
+    assert 'Call Action Type Qcc' in df.columns.values
+    assert 'Call Result Type Qcc' in df.columns.values
+
+
+def test_good_file2(updated_fn):
+    df = read_rpc(updated_fn)
     assert 'Created By Qcc' in df.columns.values
     assert 'Acct Id Acc' in df.columns.values
     assert 'Call Action Type Qcc' in df.columns.values

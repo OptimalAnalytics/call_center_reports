@@ -2,6 +2,7 @@ import pytest
 from process_reports import read_rpc, process_rpc
 import os
 import pandas as pd
+import numpy as np
 
 
 @pytest.fixture
@@ -80,7 +81,9 @@ def test_type(good_df):
         ['Acct 51294', '2018-02-01 16:48:49', 'CR-Agent 51849', 'CC', 'UPOT'],
         ['Acct 55034', '2018-02-01 11:36:47', 'CR-Agent 55579', 'THC', 'CB'],
         ['Acct 55034', '2018-02-01 11:36:47', 'cr-Agent 55579', 'THC', 'CB'],
-        ['Acct 55034', '2018-02-01 11:36:47', ' cr-Agent 55579', 'THC', 'CB']
+        ['Acct 55034', '2018-02-01 11:36:47', ' cr-Agent 55579', 'THC', 'CB'],
+        ['Acct 55034', '2018-02-01 11:36:47', ' cr-Agent 55579', 'THC', np.nan],
+
     ]
     df = pd.DataFrame(data, columns=good_df.columns)
 
@@ -88,5 +91,5 @@ def test_type(good_df):
 
     assert len(df_p.index) == len(data)
     assert df_p['GC'].sum() == 8
-    assert df_p['CR'].sum() == 4
+    assert df_p['CR'].sum() == 5
     assert df_p['HD'].sum() == 2
