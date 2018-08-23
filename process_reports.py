@@ -6,16 +6,13 @@ import os
 import argparse
 import datetime
 import traceback
-# from tkinter import Tk
-# from tkinter.filedialog import askopenfilename
 from gooey import GooeyParser, Gooey
-logger = customLogger('report', fn='process_reports.log', mode='a')
+logger = customLogger('report', fn='process_reports.log', mode='a', term_width=75)
 
 
 @Gooey(program_name="RPC Processing",
        terminal_font_family="Courier New",
-       terminal_font_size=8,
-       default_size=(720, 530))
+       terminal_font_size=8)
 def main(argv=None):
     '''
     runs the primary section of code for this process leaning heavily

@@ -7,8 +7,9 @@ name = "pypi"
 numpy = "*"
 pandas = "*"
 xlrd = "*"
-colored_logger = {git = "https://github.com/eskemojoe007/colored_logger"}
 pytest = "*"
+gooey = "*"
+colored_logger = {git = "https://github.com/eskemojoe007/colored_logger"}
 
 [dev-packages]
 pyinstaller = "*"
