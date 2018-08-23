@@ -22,7 +22,13 @@ def main(argv=None):
     # Parse inputs
     parser = RPCArgParse()
     args = parser.parse_args(argv)
-    logger.info('process_reports - STARTING SCRIPT')
+
+    # Perform sub tasks
+    sub_script(args)
+
+
+def sub_script(args):
+    logger.info('STARTING Script')
 
     rpc_fn = get_input_file(args, 'rpc_fn', 'RPC')
     bucket_fn = get_input_file(args, 'bucket_fn', 'Buckets')
@@ -605,4 +611,5 @@ class RPCArgParse(argparse_logger):
 if __name__ == '__main__':
     #  Set up logger
     sys.excepthook = log_uncaught_exceptions
+    logger.info('Starting App')
     main()
