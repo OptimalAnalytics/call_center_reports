@@ -16,7 +16,7 @@ jobs:
           name: install python dependencies
           command: |
             sudo pip install pipenv
-            pipenv install -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-14.04 wxPython
+            pip install -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-14.04 wxPython
             pipenv install
       - save_cache:
           key: deps9-{{ .Branch }}-{{ checksum "Pipfile.lock" }}
