@@ -18,7 +18,7 @@
     "default": {
         "colored-logger": {
             "git": "https://github.com/eskemojoe007/colored_logger",
-            "ref": "59791d703ae0d191d21149e06f1cc37e4ada2e61"
+            "ref": "44e38d6043e63fd256d3577b639f48e2ac9e0ca3"
         },
         "et-xmlfile": {
             "hashes": [
