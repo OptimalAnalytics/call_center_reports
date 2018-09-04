@@ -28,6 +28,14 @@ want the output stored in (this is remembered after the first go.)
 
 Clicking start will then kick off the process.  When done, check the output files.
 
+### Checking the logs
+If there is an error, logs are kept in the `%localappdata%` folder, which is confusing to get to.
+So, there is a shortcut in the start menu
+
+![image](https://user-images.githubusercontent.com/22135005/45061522-d7ea0a80-b072-11e8-95db-528aa420bba1.png)
+
+This log will help the developers debug what went wrong.  
+
 ## Developer Instructions
 
 ### Cloning, installing, running, and compiling
