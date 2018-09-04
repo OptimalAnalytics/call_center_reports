@@ -7,8 +7,7 @@
 ; (To generate a new GUID, click Tools | Generate GUID inside the IDE.)
 AppId={{78F004A2-0A28-4E7F-BD83-0ED27E663582}
 AppName=RPC Processing
-AppVersion=0.40
-;AppVerName=RPC Processing 0.40
+AppVersion=0.50
 AppPublisher=Optimal Analytics LLC.
 AppPublisherURL=https://github.com/eskemojoe007/call_center_reports
 AppSupportURL=https://github.com/eskemojoe007/call_center_reports
@@ -31,8 +30,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: ".\dist\RPC Processing.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: ".\dist\process_reports.log"; DestDir: "{localappdata}\RPCProcessing"; Flags: onlyifdoesntexist uninsneveruninstall
+Source: "dist\RPC Processing.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "dist\process_reports.log"; DestDir: "{localappdata}\RPCProcessing"; Flags: onlyifdoesntexist uninsneveruninstall
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

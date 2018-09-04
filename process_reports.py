@@ -589,6 +589,11 @@ def get_log_root(root_directory=None, fol='RPCProcessing'):
     return total_path
 
 
+def setup_logger():
+    logger = customLogger('report', fn=get_log_file(), mode='a', term_width=75)
+    setLevels(logger=logger, file_level='DEBUG', stream_level='INFO')
+    return logger
+
 def get_log_file(fn='process_reports.log', **kwargs):
 
     total_path = get_log_root(**kwargs)
@@ -608,7 +613,7 @@ def get_prev_save_location(fn='last_output_dir.log', root_directory=None):
 
         return location
 
-    return None
+    return ""
 
 
 def set_prev_save_location(location, fn='last_output_dir.log', root_directory=None):
@@ -671,10 +676,10 @@ class RPCArgParse(argparse_logger):
                                   help='Each file will start with this header, ie YYYY_MM_DD_<DESCRIP>.csv')
 
 
+logger = setup_logger()
+
 if __name__ == '__main__':
     #  Set up logger
-    logger = customLogger('report', fn=get_log_file(), mode='a', term_width=75)
     sys.excepthook = log_uncaught_exceptions
-    setLevels(logger=logger, file_level='DEBUG', stream_level='INFO')
     logger.info('Starting App')
     main()

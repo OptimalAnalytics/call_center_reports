@@ -28,7 +28,7 @@ def test_default(rpc_fn, bucket_fn, header):
     # Run the main
     parser = RPCArgParse()
 
-    args = parser.parse_args(['-r', rpc_fn, '-b', bucket_fn, '-o', os.path.join('tests', 'test_out')])
+    args = parser.parse_args(['-r', rpc_fn, '-b', bucket_fn, '-o', 'test_out', '-d', 'tests'])
     sub_script(args)
 
     # Read in the files to ensure it is working

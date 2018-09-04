@@ -29,7 +29,7 @@ def descrip_RPCArgParse():
 
 @pytest.fixture
 def typical_args():
-    return ['-r', rpc_fn_data[0][0], '-b', bucket_fn_data[0][0]]
+    return ['-r', rpc_fn_data[0][0], '-b', bucket_fn_data[0][0], '-d' , 'Sample_Reports']
 
 
 def test_RPCArgParse_descrip1(rpcargparse):
@@ -57,10 +57,14 @@ def test_good_bucket(rpcargparse):
     We expect this to pass using xpass with a good filename
     https://docs.pytest.org/en/documentation-restructure/how-to/skipping.html
     '''
-    rpcargparse.parse_args(['-r', rpc_fn_data[0][0], '-b', bucket_fn_data[0][0]])
+    rpcargparse.parse_args(['-r', rpc_fn_data[0][0], '-b', bucket_fn_data[0][0], '-d', 'tests'])
 
 
-@pytest.mark.parametrize('parse', [['-b', bucket_fn_data[1][0]], ['-o']])
+@pytest.mark.parametrize('parse', [
+    ['-b', bucket_fn_data[1][0]],
+    ['-o'],
+    ['-r', rpc_fn_data[0][0], '-b', bucket_fn_data[0][0], '-d', 'stupid_bad']
+    ])
 def test_bad_arg(parse, rpcargparse):
     '''
     These are tests we expect to fail, bad file, bad syntax etc.
