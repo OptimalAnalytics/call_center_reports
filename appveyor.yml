@@ -3,12 +3,11 @@ image:
   - Visual Studio 2017
 
 environment:
-  matrix:
   - PYTHON: C:\\Python36-x64
-  - PYTHON: C:\\Python36
 
 install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+  # TODO: this isn't smart enough to grab the right python...need to fix that.
   - "python -m pip install -U pip pipenv"
   - "pipenv install --dev"
 
