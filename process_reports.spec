@@ -1,5 +1,11 @@
 # -*- mode: python -*-
 
+import gooey
+gooey_root = os.path.dirname(gooey.__file__)
+gooey_languages = Tree(os.path.join(
+    gooey_root, 'languages'), prefix='gooey/languages')
+gooey_images = Tree('images', prefix='gooey/images')
+
 block_cipher = None
 
 
@@ -18,15 +24,18 @@ a = Analysis(['process_reports.py'],
              win_private_assemblies=False,
              cipher=block_cipher)
 pyz = PYZ(a.pure, a.zipped_data,
-             cipher=block_cipher)
+          cipher=block_cipher)
 exe = EXE(pyz,
           a.scripts,
           a.binaries,
           a.zipfiles,
           a.datas,
-          name='process_reports',
+          gooey_languages,
+          gooey_images,
+          name='RPC Processing',
           debug=False,
           strip=False,
           upx=True,
           runtime_tmpdir=None,
-          console=True )
+          console=False,
+          icon=os.path.join('images', 'program_icon.ico'))

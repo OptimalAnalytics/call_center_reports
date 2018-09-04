@@ -1,5 +1,5 @@
 import pytest
-from process_reports import main
+from process_reports import sub_script, RPCArgParse
 import os
 import pandas as pd
 
@@ -26,7 +26,10 @@ def bucket_fn(request):
     ], indirect=['rpc_fn', 'bucket_fn'])
 def test_default(rpc_fn, bucket_fn, header):
     # Run the main
-    main(['-r', rpc_fn, '-b', bucket_fn, '-o', os.path.join('tests', 'test_out')])
+    parser = RPCArgParse()
+
+    args = parser.parse_args(['-r', rpc_fn, '-b', bucket_fn, '-o', os.path.join('tests', 'test_out')])
+    sub_script(args)
 
     # Read in the files to ensure it is working
     good = header

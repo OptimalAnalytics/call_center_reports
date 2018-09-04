@@ -6,22 +6,29 @@ import os
 import argparse
 import datetime
 import traceback
-from tkinter import Tk
-from tkinter.filedialog import askopenfilename
-logger = customLogger('report', fn='process_reports.log', mode='a')
+from gooey import GooeyParser, Gooey
+logger = customLogger('report', fn='process_reports.log', mode='a', term_width=75)
 
 
+@Gooey(program_name="RPC Processing",
+       terminal_font_family="Courier New",
+       terminal_font_size=8)
 def main(argv=None):
     '''
     runs the primary section of code for this process leaning heavily
     on the support functions
     '''
 
-    logger.info('process_reports - STARTING SCRIPT')
-
     # Parse inputs
     parser = RPCArgParse()
     args = parser.parse_args(argv)
+
+    # Perform sub tasks
+    sub_script(args)
+
+
+def sub_script(args):
+    logger.info('STARTING Script')
 
     rpc_fn = get_input_file(args, 'rpc_fn', 'RPC')
     bucket_fn = get_input_file(args, 'bucket_fn', 'Buckets')
@@ -71,13 +78,14 @@ def read_rpc(fn, f_type=None, converters={'Acct Id Acc': str}, **kwargs):
     '''
 
     # Read in the raw dataframe with basic formatting tips
-    df_raw = read_info(fn, converters=converters, ftype=f_type, header=None, **kwargs)
+    df_raw = read_info(fn, converters=converters,
+                       ftype=f_type, header=None, **kwargs)
     df_raw.dropna(axis=1, how='all', inplace=True)
 
     # https://stackoverflow.com/questions/47039309/dynamically-skip-top-blank-rows-of-excel-in-python-pandas
     for i, row in df_raw.iterrows():
         if row.notnull().all():
-            data = df_raw.iloc[(i+1):].reset_index(drop=True)
+            data = df_raw.iloc[(i + 1):].reset_index(drop=True)
             data.columns = list(df_raw.iloc[i])
             break
     # TODO: Check to make sure that we can convert to string
@@ -462,7 +470,7 @@ def Queue_Summary(all_df):
         'CR_OB_PTP',
         'CR_IB_RPC',
         'CR_IB_PTP',
-        ]
+    ]
 
     summary_df = summary_df[cols]
 
@@ -524,27 +532,28 @@ def get_input_file(parsed_args, key, real_text=None):
     if real_text is None:
         real_text = key
     if vars(parsed_args)[key] is None:
-        logger.debug(
-            'You didnt enter a file in the command line for %s...'
-            'opening dialog' % (key))
-        return tk_open_file('Select File for %s' % real_text)
+        # logger.debug(
+        #     'You didnt enter a file in the command line for %s...'
+        #     'opening dialog' % (key))
+        # return tk_open_file('Select File for %s' % real_text)
+        logger.error('You didnt enter a file input')
     else:
         return vars(parsed_args)[key]
 
 
-def tk_open_file(title=None):
-    # http://infohost.nmt.edu/tcc/help/pubs/tkinter/web/tkFileDialog.html
-    Tk().withdraw()  # we don't want a full GUI, so keep the root window from
-    # show an "Open" dialog box and return the path to the selected file
-    filename = askopenfilename(title=title)
-    if not filename:
-        logger.error('You didnt select a filename for %s' % (title))
-        logger.critical('ABORTING SCRIPT')
-        sys.exit(0)
-    return filename
+# def tk_open_file(title=None):
+#     # http://infohost.nmt.edu/tcc/help/pubs/tkinter/web/tkFileDialog.html
+#     Tk().withdraw()  # we don't want a full GUI, so keep the root window from
+#     # show an "Open" dialog box and return the path to the selected file
+#     filename = askopenfilename(title=title)
+#     if not filename:
+#         logger.error('You didnt select a filename for %s' % (title))
+#         logger.critical('ABORTING SCRIPT')
+#         sys.exit(0)
+#     return filename
 
 
-class argparse_logger(argparse.ArgumentParser):
+class argparse_logger(GooeyParser):
     def _print_message(self, message, file=None):
         if file is sys.stderr:
             logger.warning('Arg Parse did something bad...see below:')
@@ -575,23 +584,32 @@ class RPCArgParse(argparse_logger):
         return arg
 
     def add_CustomElements(self):
-        self.add_argument('-r', '--rpc_fn', metavar='RPC_INPUT_PATH',
-                          type=self.is_valid_file,
-                          help='Needs to be the full or '
-                          'relative path to the RPC excel file')
-        self.add_argument('-b', '--bucket_fn', metavar='BUCKET_INPUT_PATH',
-                          type=self.is_valid_file,
-                          help='Needs to be the full or '
-                          'relative path to the Buckets excel file')
-        self.add_argument('-o', '--output_fn', metavar='OUTPUT_FN_HEADER',
-                          type=str,
-                          default='%s' % datetime.date.today().strftime(
-                              '%Y_%m_%d'),
-                          help='Output file location, '
-                          'defaults to YYYY_MM_DD_<DESCRIP>.csv')
+        input_group = self.add_argument_group(
+            'Input Files', 'Select the input RPC and Bucket files')
+        input_group.add_argument('-r', '--rpc_fn', metavar='RPC INPUT PATH',
+                                 type=self.is_valid_file,
+                                 help='Needs to be the full or '
+                                 'relative path to the RPC excel file',
+                                 widget='FileChooser',
+                                 required=True)
+        input_group.add_argument('-b', '--bucket_fn', metavar='BUCKET INPUT PATH',
+                                 type=self.is_valid_file,
+                                 help='Needs to be the full or '
+                                 'relative path to the Buckets excel file',
+                                 widget='FileChooser',
+                                 required=True)
+        output_group = self.add_argument_group(
+            'Output Naming', "Optional...defaults to today's date")
+        output_group.add_argument('-o', '--output_fn', metavar='OUTPUT_FN_HEADER',
+                                  type=str,
+                                  default='%s' % datetime.date.today().strftime(
+                                      '%Y_%m_%d'),
+                                  help='Output file location, '
+                                  'defaults to YYYY_MM_DD_<DESCRIP>.csv')
 
 
 if __name__ == '__main__':
     #  Set up logger
     sys.excepthook = log_uncaught_exceptions
+    logger.info('Starting App')
     main()
