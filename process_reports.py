@@ -1,4 +1,5 @@
 from colored_logger import customLogger
+from colored_logger import setLevels
 import numpy as np
 import pandas as pd
 import sys
@@ -7,12 +8,12 @@ import argparse
 import datetime
 import traceback
 from gooey import GooeyParser, Gooey
-logger = customLogger('report', fn='process_reports.log', mode='a', term_width=75)
 
 
 @Gooey(program_name="RPC Processing",
        terminal_font_family="Courier New",
-       terminal_font_size=8)
+       terminal_font_size=8,
+       default_size=(610, 650))
 def main(argv=None):
     '''
     runs the primary section of code for this process leaning heavily
@@ -32,15 +33,18 @@ def sub_script(args):
 
     rpc_fn = get_input_file(args, 'rpc_fn', 'RPC')
     bucket_fn = get_input_file(args, 'bucket_fn', 'Buckets')
-    output_fn = args.output_fn
+    output_header = args.output_fn
+    output_folder = args.dir
+
+    set_prev_save_location(output_folder)
 
     # Read in RPC file
-    logger.debug('Reading in rpc data file: %s' % (rpc_fn))
+    logger.info('Reading in rpc data file: %s' % (rpc_fn))
     rpc = read_rpc(rpc_fn)
     rpc = process_rpc(rpc)
 
     # Get all the buckets
-    logger.debug('Reading in bucket data file: %s' % (bucket_fn))
+    logger.info('Reading in bucket data file: %s' % (bucket_fn))
     buckets = read_buckets(bucket_fn)
 
     # Remove any entry with a missing acct_num...these will likely be bad
@@ -49,7 +53,7 @@ def sub_script(args):
     check_bucket_duplicates(buckets)
 
     # Merge the two together
-    logger.debug('merging bucket and rpc information')
+    logger.info('merging bucket and rpc information')
     all_df = pd.merge(buckets,
                       rpc[['Acct Id Acc', 'IB_OB', 'stripped',
                            'GC', 'CR', 'HD', 'Agent']],
@@ -59,15 +63,15 @@ def sub_script(args):
     fill_all_bool(all_df, ['GC', 'CR', 'HD'], default=False)
 
     # Summarize and output
-    logger.debug('summarizing data...')
+    logger.info('summarizing data...')
     rpc_summary_df = rpc_summary(all_df)
-    to_csv(rpc_summary_df, output_fn, 'RPC_Summary')
+    to_csv(rpc_summary_df, output_folder, output_header, 'RPC_Summary')
 
     Queue_Summary_df = Queue_Summary(all_df)
-    to_csv(Queue_Summary_df, output_fn, 'Queue_Summary')
+    to_csv(Queue_Summary_df, output_folder, output_header, 'Queue_Summary')
 
     Agent_Summary_df = Agent_Summary(all_df)
-    to_csv(Agent_Summary_df, output_fn, 'Agent_Summary')
+    to_csv(Agent_Summary_df, output_folder, output_header, 'Agent_Summary')
 
     logger.info('Ending Script successfully')
 
@@ -512,9 +516,10 @@ def Agent_Summary(all_df):
     return summary_df
 
 
-def to_csv(df, output_header, tail):
+def to_csv(df, output_folder, output_header, tail):
     write_fn = '{}_{}.csv'.format(output_header, tail)
-    logger.debug('Outputing CSV to : {}'.format(write_fn))
+    write_fn = os.path.join(output_folder, write_fn)
+    logger.info('Outputing CSV to : {}'.format(write_fn))
 
     if len(df.index) < 1:
         logger.error(
@@ -562,6 +567,64 @@ class argparse_logger(GooeyParser):
             super()._print_message(message, file=file)
 
 
+def get_log_root(root_directory=None, fol='RPCProcessing'):
+    if root_directory is None:
+        # TODO: Add Mac Functionality here instead of just windows.
+        root_directory = os.getenv('LOCALAPPDATA')
+
+    if fol is None:
+        return root_directory
+
+    if not os.path.isdir(root_directory):
+        logger.error(
+            'Cannot find root_directory for log file: {}'.format(root_directory))
+        return None
+
+    total_path = os.path.join(root_directory, fol)
+
+    # Create folder if it doesn't exist
+    if not os.path.isdir(total_path):
+        os.mkdir(total_path)
+
+    return total_path
+
+
+def setup_logger():
+    logger = customLogger('report', fn=get_log_file(), mode='a', term_width=75)
+    setLevels(logger=logger, file_level='DEBUG', stream_level='INFO')
+    return logger
+
+def get_log_file(fn='process_reports.log', **kwargs):
+
+    total_path = get_log_root(**kwargs)
+
+    return os.path.join(total_path, fn)
+
+
+def get_prev_save_location(fn='last_output_dir.log', root_directory=None):
+    if root_directory is None:
+        root_directory = get_log_root()
+
+    fn = os.path.join(root_directory, fn)
+    if os.path.exists(fn):
+        with open(fn, 'r') as f:
+            location = f.read()
+            logger.debug('Default output location is: {}'.format(location))
+
+        return location
+
+    return ""
+
+
+def set_prev_save_location(location, fn='last_output_dir.log', root_directory=None):
+    if root_directory is None:
+        root_directory = get_log_root()
+
+    fn = os.path.join(root_directory, fn)
+    with open(fn, 'w') as f:
+        f.write(location)
+
+
 class RPCArgParse(argparse_logger):
 
     def __init__(self, *args, **kwargs):
@@ -585,28 +648,35 @@ class RPCArgParse(argparse_logger):
 
     def add_CustomElements(self):
         input_group = self.add_argument_group(
-            'Input Files', 'Select the input RPC and Bucket files')
-        input_group.add_argument('-r', '--rpc_fn', metavar='RPC INPUT PATH',
+            'Input Files', 'Select the input RPC and Bucket files',
+            gooey_options={'show_border': False, 'columns': 1})
+        input_group.add_argument('-r', '--rpc_fn', metavar='RPC File',
                                  type=self.is_valid_file,
-                                 help='Needs to be the full or '
-                                 'relative path to the RPC excel file',
+                                 help='Select RPC Excel file you wish to process',
                                  widget='FileChooser',
                                  required=True)
-        input_group.add_argument('-b', '--bucket_fn', metavar='BUCKET INPUT PATH',
+        input_group.add_argument('-b', '--bucket_fn', metavar='Bucket File',
                                  type=self.is_valid_file,
-                                 help='Needs to be the full or '
-                                 'relative path to the Buckets excel file',
+                                 help='Select the Bucket Excel file',
                                  widget='FileChooser',
                                  required=True)
         output_group = self.add_argument_group(
-            'Output Naming', "Optional...defaults to today's date")
-        output_group.add_argument('-o', '--output_fn', metavar='OUTPUT_FN_HEADER',
+            'Output Naming', "Choose where an how you want to save the outputs",
+            gooey_options={'show_border': False, 'columns': 1})
+        output_group.add_argument('-d', '--dir', metavar='Output Directory',
+                                  type=self.is_valid_file,
+                                  default='{}'.format(get_prev_save_location()),
+                                  help='Select the folder where you want the outputs saved',
+                                  widget='DirChooser',
+                                  required=True)
+        output_group.add_argument('-o', '--output_fn', metavar='Output Header',
                                   type=str,
                                   default='%s' % datetime.date.today().strftime(
                                       '%Y_%m_%d'),
-                                  help='Output file location, '
-                                  'defaults to YYYY_MM_DD_<DESCRIP>.csv')
+                                  help='Each file will start with this header, ie YYYY_MM_DD_<DESCRIP>.csv')
 
+
+logger = setup_logger()
 
 if __name__ == '__main__':
     #  Set up logger

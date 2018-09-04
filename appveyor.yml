@@ -7,17 +7,17 @@ environment:
 
 install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
-  # TODO: this isn't smart enough to grab the right python...need to fix that.
   - "python -m pip install -U pip pipenv"
-  - "pipenv install --dev"
+  - "pipenv --python %PYTHON%\\python.exe install --dev"
 
 build: off
 
 test_script:
   - "pipenv run python -m pytest"
 
-after_test:
-  - "pipenv run pyinstaller process_reports.spec"
+# TODO: Add Building and tests around the build.  Also auto push to github.
+# after_test:
+#   - "pipenv run pyinstaller process_reports.spec"
 
-artifacts:
-  - path: dist\*
+# artifacts:
+#   - path: dist\*
