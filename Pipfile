@@ -7,15 +7,14 @@ name = "pypi"
 numpy = "*"
 pandas = "*"
 xlrd = "*"
-pytest = "*"
 gooey = "*"
 colored_logger = {git = "https://github.com/eskemojoe007/colored_logger"}
+openpyxl = "*"
+pypiwin32 = {version = "*", sys_platform = "== 'win32'"}
 
 [dev-packages]
 pyinstaller = "*"
-"pypiwin32" = "*"
-ipython = "*"
-openpyxl = "*"
+pytest = "*"
 
 [requires]
 python_version = "3.6"
