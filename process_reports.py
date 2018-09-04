@@ -7,7 +7,6 @@ import argparse
 import datetime
 import traceback
 from gooey import GooeyParser, Gooey
-logger = customLogger('report', fn='process_reports.log', mode='a', term_width=75)
 
 
 @Gooey(program_name="RPC Processing",
@@ -562,6 +561,24 @@ class argparse_logger(GooeyParser):
             super()._print_message(message, file=file)
 
 
+def get_log_file(root_directory=None, fol='RPCProcessing', fn='process_reports.log'):
+    if root_directory is None:
+        # TODO: Add Mac Functionality here instead of just windows.
+        root_directory = os.getenv('LOCALAPPDATA')
+
+    if not os.path.isdir(root_directory):
+        logger.error('Cannot find root_directory for log file: {}'.format(root_directory))
+        return None
+
+    total_path = os.path.join(root_directory, fol)
+
+    # Create folder if it doesn't exist
+    if not os.path.isdir(total_path):
+        os.mkdir(total_path)
+
+    return os.path.join(total_path, fn)
+
+
 class RPCArgParse(argparse_logger):
 
     def __init__(self, *args, **kwargs):
@@ -610,6 +627,7 @@ class RPCArgParse(argparse_logger):
 
 if __name__ == '__main__':
     #  Set up logger
+    logger = customLogger('report', fn=get_log_file(), mode='a', term_width=75)
     sys.excepthook = log_uncaught_exceptions
     logger.info('Starting App')
     main()
